@@ -37,13 +37,15 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="text-white font-bold text-lg tracking-tight">AutoPC</span>
-                <span className="text-cyan-400 font-semibold text-xs px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-800/60 uppercase tracking-wider">
-                  MSP Deploy
+                <span className="text-white font-extrabold text-xl tracking-tight bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-400 bg-clip-text text-transparent">
+                  FDIM
+                </span>
+                <span className="text-amber-400 font-semibold text-xs px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-800/60 uppercase tracking-wider font-mono">
+                  Fuck Doing It Manually
                 </span>
               </div>
               <p className="text-xs text-slate-400 hidden sm:block">
-                Domain Workstation Provisioning & Silent UNC Installer Suite
+                Zero-Touch Workstation Provisioning & Silent UNC Installer Suite
               </p>
             </div>
           </div>

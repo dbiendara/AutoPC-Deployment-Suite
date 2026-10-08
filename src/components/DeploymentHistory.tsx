@@ -40,10 +40,10 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-md">
         <div className="flex items-center space-x-2 mb-1">
           <History className="w-5 h-5 text-cyan-400" />
-          <h1 className="text-xl font-bold text-white">Workstation Provisioning Audit Register</h1>
+          <h1 className="text-xl font-bold text-white">FDIM Workstation Provisioning Audit Register</h1>
         </div>
         <p className="text-xs text-slate-400">
-          Historical records of configured domain workstations, customer assignments, and installed software
+          Historical records of configured domain workstations, customer assignments, and installed software ("Fuck Doing It Manually")
         </p>
       </div>
 

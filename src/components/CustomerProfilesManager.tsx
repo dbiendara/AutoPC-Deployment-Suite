@@ -275,8 +275,8 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
       printers,
       userLogonStaging: {
         enabled: true,
-        stagingPath: 'C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1',
-        activeSetupKey: 'AutoPC_UserProvisioning',
+        stagingPath: 'C:\\ProgramData\\FDIM\\UserLogonSetup.ps1',
+        activeSetupKey: 'FDIM_UserProvisioning',
         scheduledTaskFallback: true,
         cleanUpAfterFirstRun: false,
       },
@@ -311,7 +311,7 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
         <div>
           <div className="flex items-center space-x-2 mb-1">
             <Building2 className="w-5 h-5 text-cyan-400" />
-            <h1 className="text-xl font-bold text-white">Customer & Company Deployment Profiles</h1>
+            <h1 className="text-xl font-bold text-white">FDIM Multi-Tenant Company Deployment Profiles</h1>
           </div>
           <p className="text-xs text-slate-400">
             Define multi-tenant customer settings: Domain name, default AD Admin group, power plan timeouts, and default software packages assigned to each customer.
@@ -536,7 +536,7 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
                   Why this is staged for First Logon:
                 </p>
                 <p className="text-amber-300/80 text-[11px] leading-relaxed">
-                  During workstation provisioning, only the technician is logged on. Network drives (<code className="bg-amber-900/40 px-1 rounded font-mono">HKCU:\Network</code>) and per-user network printers require domain Kerberos user credentials. AutoPC stages <code className="bg-amber-900/40 px-1 rounded font-mono">C:\ProgramData\AutoPC\UserLogonSetup.ps1</code> and registers it in Windows <strong>Active Setup</strong> (<code className="bg-amber-900/40 px-1 rounded font-mono">HKLM:\...\Active Setup</code>) &amp; machine print connections (<code className="bg-amber-900/40 px-1 rounded font-mono">printui /ga</code>). When the employee logs into Windows for the first time, their drives and printers map automatically!
+                  During workstation provisioning, only the technician is logged on. Network drives (<code className="bg-amber-900/40 px-1 rounded font-mono">HKCU:\Network</code>) and per-user network printers require domain Kerberos user credentials. FDIM stages <code className="bg-amber-900/40 px-1 rounded font-mono">C:\ProgramData\FDIM\UserLogonSetup.ps1</code> and registers it in Windows <strong>Active Setup</strong> (<code className="bg-amber-900/40 px-1 rounded font-mono">HKLM:\...\Active Setup</code>) &amp; machine print connections (<code className="bg-amber-900/40 px-1 rounded font-mono">printui /ga</code>). When the employee logs into Windows for the first time, their drives and printers map automatically!
                 </p>
               </div>
             </div>

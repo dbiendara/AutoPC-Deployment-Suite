@@ -51,8 +51,8 @@ export interface PrinterMapping {
 
 export interface UserLogonStagingConfig {
   enabled: boolean;
-  stagingPath?: string; // Default: "C:\ProgramData\AutoPC\UserLogonSetup.ps1"
-  activeSetupKey?: string; // Default: "AutoPC_UserProvisioning"
+  stagingPath?: string; // Default: "C:\ProgramData\FDIM\UserLogonSetup.ps1"
+  activeSetupKey?: string; // Default: "FDIM_UserProvisioning"
   scheduledTaskFallback?: boolean; // Register at-logon task as backup
   cleanUpAfterFirstRun?: boolean;
 }

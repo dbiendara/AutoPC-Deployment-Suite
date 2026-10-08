@@ -68,8 +68,8 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
             <h2 className="text-2xl font-extrabold text-white tracking-tight">
               Workstation Provisioning Certificate
             </h2>
-            <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest font-mono">
-              AutoPC Managed Service Provider Deployment Audit
+            <p className="text-xs text-amber-300/90 mt-1 uppercase tracking-widest font-mono">
+              FDIM (Fuck Doing It Manually) Workstation Deployment Audit
             </p>
           </div>
 

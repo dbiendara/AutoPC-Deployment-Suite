@@ -299,11 +299,14 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Active Directory Member PC • Hostname Configured</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Workstation Onboarding & Software Deployment
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center space-x-2.5">
+              <span>FDIM Workstation Provisioning</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-amber-950/80 border border-amber-800 text-amber-300 font-mono font-medium">
+                Fuck Doing It Manually
+              </span>
             </h1>
             <p className="mt-1 text-slate-300 text-xs sm:text-sm">
-              Select the customer company profile, verify automated system configuration switches, and execute silent software installations from UNC shares.
+              Select the customer company profile, verify automated system configuration switches, staged network resources, and execute silent zero-touch deployments.
             </p>
           </div>
 
@@ -858,7 +861,7 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
             <p className="text-amber-300/80 leading-relaxed">
               When deploying a new PC as administrator, the end-user is not yet logged in.
               Network drive mappings (<code className="bg-amber-900/40 px-1 rounded font-mono">HKCU:\Network</code>) and per-user network printers require the employee's interactive Kerberos session.
-              AutoPC generates <code className="bg-amber-900/40 px-1 rounded font-mono">C:\ProgramData\AutoPC\UserLogonSetup.ps1</code> and registers it in Windows <strong>Active Setup</strong> (<code className="bg-amber-900/40 px-1 rounded font-mono">HKLM:\SOFTWARE\Microsoft\Active Setup\...</code>) and machine print connections (<code className="bg-amber-900/40 px-1 rounded font-mono">printui.dll /ga</code>).
+              FDIM generates <code className="bg-amber-900/40 px-1 rounded font-mono">C:\ProgramData\FDIM\UserLogonSetup.ps1</code> and registers it in Windows <strong>Active Setup</strong> (<code className="bg-amber-900/40 px-1 rounded font-mono">HKLM:\SOFTWARE\Microsoft\Active Setup\...</code>) and machine print connections (<code className="bg-amber-900/40 px-1 rounded font-mono">printui.dll /ga</code>).
               When the employee signs into Windows for the first time, all drives and printers configure silently and automatically!
             </p>
           </div>

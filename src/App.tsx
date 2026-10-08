@@ -41,8 +41,8 @@ export default function App() {
   const [stagedPrinters, setStagedPrinters] = useState<PrinterMapping[]>([]);
   const [userLogonStaging, setUserLogonStaging] = useState<UserLogonStagingConfig>({
     enabled: true,
-    stagingPath: 'C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1',
-    activeSetupKey: 'AutoPC_UserProvisioning',
+    stagingPath: 'C:\\ProgramData\\FDIM\\UserLogonSetup.ps1',
+    activeSetupKey: 'FDIM_UserProvisioning',
     scheduledTaskFallback: true,
     cleanUpAfterFirstRun: false,
   });

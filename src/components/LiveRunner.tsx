@@ -259,7 +259,7 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
         stagedDrives,
         stagedPrinters,
         userLogonStaging,
-        technicianName: 'Admin (AutoPC Suite)',
+        technicianName: 'Admin (FDIM Suite)',
         logs,
         results: {
           packages: Object.fromEntries(selectedPackages.map((p) => [p.id, { status: 'success', exitCode: 0 }])),
@@ -318,7 +318,7 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
       } else if (currentStep.type === 'logon-staging') {
         const dCount = stagedDrives.length;
         const pCount = stagedPrinters.length;
-        successMsg = `[${finishTimeStr}] [SUCCESS] Active Setup registered (HKLM) & payload staged (C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1). ${dCount} network drive(s) and ${pCount} printer(s) will map seamlessly upon initial user logon!`;
+        successMsg = `[${finishTimeStr}] [SUCCESS] Active Setup registered (HKLM) & payload staged (C:\\ProgramData\\FDIM\\UserLogonSetup.ps1). ${dCount} network drive(s) and ${pCount} printer(s) will map seamlessly upon initial user logon!`;
       }
 
       setLogs((prev) => [...prev, { timestamp: finishTimeStr, level: 'success', message: successMsg }]);
@@ -521,7 +521,7 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
           {/* Console Container */}
           <div className="flex-1 bg-slate-950 border border-slate-850 rounded-xl p-4 font-mono text-xs overflow-y-auto leading-relaxed space-y-1.5 selection:bg-cyan-600 selection:text-white">
             <div className="text-slate-500 pb-1 border-b border-slate-850">
-              # AutoPC Deployment Session: {customer.companyName} [{machineName || '$env:COMPUTERNAME'}]
+              # FDIM (Fuck Doing It Manually) Deployment Session: {customer.companyName} [{machineName || '$env:COMPUTERNAME'}]
             </div>
 
             {filteredLogs.map((log, index) => (

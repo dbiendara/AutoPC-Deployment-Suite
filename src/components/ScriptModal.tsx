@@ -151,11 +151,14 @@ export const ScriptModal: React.FC<ScriptModalProps> = ({
               <Terminal className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">
-                Deploy-Workstation.ps1 Generator
+              <h3 className="text-base font-bold text-white flex items-center space-x-2">
+                <span>FDIM Deploy-Workstation.ps1 Generator</span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                  Fuck Doing It Manually
+                </span>
               </h3>
               <p className="text-xs text-slate-400">
-                Self-contained PowerShell master script ready for manual execution or automated task deployment
+                Self-contained FDIM zero-touch PowerShell master script ready for manual execution or RMM deployment
               </p>
             </div>
           </div>
