@@ -125,6 +125,7 @@ export const AIDetective: React.FC<AIDetectiveProps> = ({
           fileName,
           installerType: detectionResult.installerType,
           silentArgs: detectionResult.silentArgs,
+          extraSwitches: detectionResult.extraSwitches,
           detectionRule: detectionResult.detectionRule,
         }),
       });
@@ -147,6 +148,8 @@ export const AIDetective: React.FC<AIDetectiveProps> = ({
   const handleSaveToCatalog = () => {
     if (!detectionResult) return;
 
+    const hasConfigFile = detectionResult.configFileAdvice?.includes('.tvopt') || docSnippet.includes('.tvopt');
+
     const newPackage: SoftwarePackage = {
       id: `pkg-${Date.now().toString(36)}`,
       name: softwareName,
@@ -156,6 +159,16 @@ export const AIDetective: React.FC<AIDetectiveProps> = ({
       fileName,
       installerType: detectionResult.installerType,
       silentArgs: detectionResult.silentArgs,
+      extraSwitches: detectionResult.extraSwitches,
+      configFileImport: hasConfigFile
+        ? {
+            enabled: true,
+            configFileName: 'TeamViewer_Settings.tvopt',
+            configUncPath: `${uncPath}\\TeamViewer_Settings.tvopt`,
+            importSwitch: `SETTINGSFILE="${uncPath}\\TeamViewer_Settings.tvopt"`,
+            preCopyDestination: 'C:\\Program Files\\TeamViewer\\',
+          }
+        : undefined,
       logArgs: detectionResult.logArgs,
       rebootBehavior: detectionResult.rebootBehavior,
       detectionType: detectionResult.detectionType,
@@ -163,7 +176,6 @@ export const AIDetective: React.FC<AIDetectiveProps> = ({
       successExitCodes: detectionResult.successExitCodes || [0],
       estimatedMinutes: detectionResult.estimatedMinutes || 2,
       description: detectionResult.analysisExplanation.substring(0, 160) + '...',
-      recommendedProfiles: ['developer', 'it_admin'],
       testInstallStatus: testResult?.verdict === 'PASS' ? 'Verified' : 'Untested',
       aiConfidence: detectionResult.confidenceScore,
       notes: `Scanned & validated by AI Detective. Exit codes: ${detectionResult.successExitCodes.join(', ')}`,
@@ -196,6 +208,22 @@ export const AIDetective: React.FC<AIDetectiveProps> = ({
             Quick-load enterprise software documentation samples:
           </span>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() =>
+                loadPreset({
+                  name: 'TeamViewer Host (Unattended Support)',
+                  version: '15.56.3',
+                  file: 'TeamViewer_Host.msi',
+                  unc: '\\\\corp-fs01.internal.net\\deployments\\apps\\teamviewer',
+                  url: 'https://community.teamviewer.com/English/kb/articles/39638-mass-deployment-improvements',
+                  docs: 'TeamViewer Host MSI unattended installation requires: msiexec.exe /i "TeamViewer_Host.msi" /qn CUSTOMCONFIGID=idc89120 APITOKEN=109283-acmetoken ASSIGNMENTOPTIONS="--alias %COMPUTERNAME% --grant-easy-access". To import pre-configured settings, pass SETTINGSFILE="\\\\corp-fs01\\deployments\\teamviewer\\TeamViewer_Settings.tvopt". Exit code 0 indicates success, 3010 reboot pending.',
+                })
+              }
+              className="text-xs px-3 py-1.5 rounded-lg bg-slate-900/90 hover:bg-purple-900/50 text-cyan-300 border border-cyan-500/50 transition-colors font-medium flex items-center space-x-1"
+            >
+              <span>⭐ TeamViewer Host (MSI + CustomConfigID + .tvopt)</span>
+            </button>
+
             <button
               onClick={() =>
                 loadPreset({

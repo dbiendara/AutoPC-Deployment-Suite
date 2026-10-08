@@ -1,29 +1,26 @@
 import React, { useState } from 'react';
-import { DeploymentRecord, SoftwarePackage, ChecklistItem } from '../types';
+import { DeploymentRecord, SoftwarePackage } from '../types';
 import {
   History,
   CheckCircle2,
   Clock,
   HardDrive,
-  User,
+  Building2,
   Shield,
   FileText,
   Search,
-  Download,
   Award,
 } from 'lucide-react';
 
 interface DeploymentHistoryProps {
   deployments: DeploymentRecord[];
   packages: SoftwarePackage[];
-  checklists: ChecklistItem[];
   onViewCertificate: (record: DeploymentRecord) => void;
 }
 
 export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
   deployments,
   packages,
-  checklists,
   onViewCertificate,
 }) => {
   const [search, setSearch] = useState('');
@@ -31,8 +28,8 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
   const filtered = deployments.filter((d) => {
     return (
       d.machineName.toLowerCase().includes(search.toLowerCase()) ||
-      d.employeeName.toLowerCase().includes(search.toLowerCase()) ||
-      d.department.toLowerCase().includes(search.toLowerCase()) ||
+      d.customerCompanyName.toLowerCase().includes(search.toLowerCase()) ||
+      d.domainName.toLowerCase().includes(search.toLowerCase()) ||
       d.technicianName.toLowerCase().includes(search.toLowerCase())
     );
   });
@@ -46,7 +43,7 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
           <h1 className="text-xl font-bold text-white">Workstation Provisioning Audit Register</h1>
         </div>
         <p className="text-xs text-slate-400">
-          Historical zero-touch deployment logs, technician sign-offs, and software installation records
+          Historical records of configured domain workstations, customer assignments, and installed software
         </p>
       </div>
 
@@ -55,7 +52,7 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
         <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
         <input
           type="text"
-          placeholder="Search by machine name, employee, department, or technician..."
+          placeholder="Search by machine hostname, customer company name, or domain..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
@@ -78,12 +75,15 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
                   <div>
                     <div className="flex items-center space-x-2">
                       <h3 className="text-base font-bold text-white font-mono">{dep.machineName}</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-800 font-medium">
+                        {dep.customerCompanyName}
+                      </span>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-medium">
                         {dep.status}
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Assignee: <strong className="text-slate-200">{dep.employeeName}</strong> ({dep.department}) • Serial: {dep.serialNumber}
+                      Domain: <strong className="text-slate-200 font-mono">{dep.domainName}</strong> • Tech: {dep.technicianName}
                     </p>
                   </div>
                 </div>
@@ -102,7 +102,7 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
               {/* Details grid */}
               <div className="pt-4 grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Deployment Timestamp</span>
+                  <span className="text-[11px] text-slate-400 block mb-1">Provisioning Timestamp</span>
                   <span className="text-slate-200 font-mono">
                     {new Date(dep.startedAt).toLocaleString([], {
                       dateStyle: 'short',
@@ -112,18 +112,22 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
                 </div>
 
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Technician In Charge</span>
-                  <span className="text-slate-200">{dep.technicianName}</span>
+                  <span className="text-[11px] text-slate-400 block mb-1">RDP & Admin Group</span>
+                  <span className="text-slate-200 truncate block">
+                    {dep.systemConfig?.enableRdp ? 'RDP: Yes' : 'RDP: Active'} • {dep.systemConfig?.adAdminGroupName ? dep.systemConfig.adAdminGroupName.split('\\')[1] : (dep.switchParameters?.adAdminGroupName ? String(dep.switchParameters.adAdminGroupName).split('\\')[1] : 'IT-Admins')}
+                  </span>
                 </div>
 
                 <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">Installed Packages</span>
+                  <span className="text-[11px] text-slate-400 block mb-1">Power Plan</span>
+                  <span className="text-slate-200">
+                    Screen {dep.systemConfig?.screenTimeoutAc ?? dep.switchParameters?.screenTimeoutAc ?? 15}m • Standby {dep.systemConfig?.standbyTimeoutAc === 0 || dep.switchParameters?.standbyTimeoutAc === 0 ? 'Never' : `${dep.systemConfig?.standbyTimeoutAc ?? 0}m`}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-[11px] text-slate-400 block mb-1">Deployed Packages</span>
                   <span className="text-slate-200 font-semibold">{dep.selectedPackageIds.length} Packages</span>
-                </div>
-
-                <div>
-                  <span className="text-[11px] text-slate-400 block mb-1">System Tasks Executed</span>
-                  <span className="text-slate-200 font-semibold">{dep.selectedChecklistIds.length} Checklist Tasks</span>
                 </div>
               </div>
             </div>

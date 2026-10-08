@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   SoftwarePackage,
-  ChecklistItem,
+  CustomerProfile,
+  SystemConfigSettings,
+  SystemConfigSwitch,
   DeploymentRecord,
 } from '../types';
 import {
@@ -13,7 +15,7 @@ import {
   AlertCircle,
   Clock,
   HardDrive,
-  User,
+  Building2,
   Shield,
   FileText,
   Download,
@@ -22,28 +24,31 @@ import {
   Server,
   Layers,
   Sparkles,
-  ExternalLink,
-  ChevronRight,
-  ShieldCheck,
   Award,
+  Sliders,
+  FolderOpen,
+  Circle,
 } from 'lucide-react';
 
 interface LiveRunnerProps {
   isDeploying: boolean;
   setIsDeploying: (val: boolean) => void;
   machineName: string;
-  employeeName: string;
-  department: string;
-  serialNumber: string;
+  customer: CustomerProfile;
   selectedPackages: SoftwarePackage[];
-  selectedChecklists: ChecklistItem[];
+  packageCustomSwitches: Record<string, string>;
+  packageConfigFiles: Record<string, string>;
+  systemConfig: SystemConfigSettings;
+  systemSwitches?: SystemConfigSwitch[];
+  enabledSwitchIds?: string[];
+  switchParameters?: Record<string, string | number>;
   onCompleteDeployment: (record: DeploymentRecord) => void;
   onOpenAuditModal: () => void;
 }
 
 interface StepItem {
   id: string;
-  type: 'preflight' | 'checklist' | 'package' | 'postflight';
+  type: 'preflight' | 'system' | 'package' | 'postflight';
   title: string;
   subtext: string;
   status: 'pending' | 'running' | 'success' | 'warn' | 'error';
@@ -54,11 +59,14 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
   isDeploying,
   setIsDeploying,
   machineName,
-  employeeName,
-  department,
-  serialNumber,
+  customer,
   selectedPackages,
-  selectedChecklists,
+  packageCustomSwitches,
+  packageConfigFiles,
+  systemConfig,
+  systemSwitches = [],
+  enabledSwitchIds = [],
+  switchParameters = {},
   onCompleteDeployment,
   onOpenAuditModal,
 }) => {
@@ -73,16 +81,16 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize pipeline steps when mounting or when selection changes
+  // Initialize pipeline steps
   useEffect(() => {
     const initialSteps: StepItem[] = [];
 
     // Pre-flight checks
     initialSteps.push({
-      id: 'step-preflight-admin',
+      id: 'step-preflight-ad',
       type: 'preflight',
-      title: 'Elevated Administrator Rights Verification',
-      subtext: 'Validating [Security.Principal.WindowsBuiltInRole]::Administrator',
+      title: 'Active Directory Domain Membership Verification',
+      subtext: `Validating PartOfDomain for ${customer.domainName}`,
       status: 'pending',
       logLines: [],
     });
@@ -90,30 +98,75 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
       id: 'step-preflight-unc',
       type: 'preflight',
       title: 'UNC Network Share Reachability',
-      subtext: 'Testing SMB port 445 and ping to \\\\corp-fs01.internal.net\\deployments',
+      subtext: 'Testing SMB port 445 connectivity to deployment shares',
       status: 'pending',
       logLines: [],
     });
 
-    // Checklists
-    selectedChecklists.forEach((chk) => {
-      initialSteps.push({
-        id: `step-chk-${chk.id}`,
-        type: 'checklist',
-        title: chk.title,
-        subtext: chk.description,
-        status: 'pending',
-        logLines: [],
+    // Dynamic or fallback system configurations
+    if (systemSwitches.length > 0 && enabledSwitchIds.length > 0) {
+      const activeSwitches = systemSwitches.filter((s) => enabledSwitchIds.includes(s.id));
+      activeSwitches.forEach((sw) => {
+        let sub = sw.description;
+        if (sw.parameterKey && switchParameters[sw.parameterKey] !== undefined) {
+          sub += ` [${sw.parameterKey} = ${switchParameters[sw.parameterKey]}]`;
+        }
+        initialSteps.push({
+          id: `step-sys-${sw.id}`,
+          type: 'system',
+          title: sw.title,
+          subtext: sub,
+          status: 'pending',
+          logLines: [],
+        });
       });
-    });
+    } else {
+      // Legacy fallback
+      if (systemConfig.enableRdp) {
+        initialSteps.push({
+          id: 'step-sys-sw-rdp',
+          type: 'system',
+          title: 'Enable Remote Desktop (RDP) & Firewall',
+          subtext: 'Configures fDenyTSConnections=0 and NLA user authentication',
+          status: 'pending',
+          logLines: [],
+        });
+      }
+      if (systemConfig.addAdGroupToAdmins && systemConfig.adAdminGroupName) {
+        initialSteps.push({
+          id: 'step-sys-sw-adgroup',
+          type: 'system',
+          title: `Add AD Group to Local Administrators`,
+          subtext: `Delegates admin rights to ${systemConfig.adAdminGroupName}`,
+          status: 'pending',
+          logLines: [],
+        });
+      }
+      if (systemConfig.setPowerPlan) {
+        initialSteps.push({
+          id: 'step-sys-sw-power-screen',
+          type: 'system',
+          title: 'Configure Power Plan Timeouts',
+          subtext: `Screen: ${systemConfig.screenTimeoutAc}m, Standby: ${systemConfig.standbyTimeoutAc === 0 ? 'Never' : `${systemConfig.standbyTimeoutAc}m`}`,
+          status: 'pending',
+          logLines: [],
+        });
+      }
+    }
 
     // Software packages
     selectedPackages.forEach((pkg) => {
+      const extra = packageCustomSwitches[pkg.id] || pkg.extraSwitches;
+      const config = packageConfigFiles[pkg.id] || pkg.configFileImport?.configFileName;
+      let sub = `${pkg.uncPath}\\${pkg.fileName}`;
+      if (extra) sub += ` [Extra switches active]`;
+      if (config) sub += ` [Config: ${config}]`;
+
       initialSteps.push({
         id: `step-pkg-${pkg.id}`,
         type: 'package',
         title: `Silent Install: ${pkg.name}`,
-        subtext: `${pkg.uncPath}\\${pkg.fileName} (${pkg.installerType})`,
+        subtext: sub,
         status: 'pending',
         logLines: [],
       });
@@ -123,14 +176,23 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
     initialSteps.push({
       id: 'step-postflight-audit',
       type: 'postflight',
-      title: 'Final Workstation Security Audit & Certificate',
-      subtext: 'Generating tamper-proof deployment signature & telemetry upload',
+      title: 'Workstation Verification & Handover Signoff',
+      subtext: `Certifying setup compliance for ${customer.companyName}`,
       status: 'pending',
       logLines: [],
     });
 
     setSteps(initialSteps);
-  }, [selectedPackages, selectedChecklists]);
+  }, [
+    selectedPackages,
+    systemConfig,
+    customer,
+    packageCustomSwitches,
+    packageConfigFiles,
+    systemSwitches,
+    enabledSwitchIds,
+    switchParameters,
+  ]);
 
   // Elapsed timer
   useEffect(() => {
@@ -143,7 +205,7 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
     return () => clearInterval(timer);
   }, [isDeploying, isPaused, isFinished]);
 
-  // Simulated execution engine
+  // Execution simulation engine
   useEffect(() => {
     if (!isDeploying || isPaused || isFinished || steps.length === 0) return;
 
@@ -153,22 +215,22 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
 
       const record: DeploymentRecord = {
         id: `dep-${Date.now().toString(36)}`,
-        machineName: machineName || 'CORP-WIN11-NEW',
-        serialNumber: serialNumber || 'N/A',
-        employeeName: employeeName || 'New Employee',
-        employeeEmail: `${(employeeName || 'employee').toLowerCase().replace(/\s+/g, '.')}@corporate.corp`,
-        department: department || 'General',
-        profileId: 'custom',
+        machineName: machineName || '$env:COMPUTERNAME',
+        domainName: customer.domainName,
+        customerProfileId: customer.id,
+        customerCompanyName: customer.companyName,
         status: 'Completed',
         startedAt: new Date(Date.now() - elapsedSeconds * 1000).toISOString(),
         completedAt: new Date().toISOString(),
         selectedPackageIds: selectedPackages.map((p) => p.id),
-        selectedChecklistIds: selectedChecklists.map((c) => c.id),
+        appliedSwitchIds: enabledSwitchIds,
+        switchParameters,
+        systemConfig,
         technicianName: 'Admin (AutoPC Suite)',
         logs,
         results: {
           packages: Object.fromEntries(selectedPackages.map((p) => [p.id, { status: 'success', exitCode: 0 }])),
-          checklists: Object.fromEntries(selectedChecklists.map((c) => [c.id, { status: 'success' }])),
+          systemConfigs: Object.fromEntries(enabledSwitchIds.map((swId) => [swId, { status: 'success' }])),
         },
       };
 
@@ -178,7 +240,6 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
 
     const currentStep = steps[currentStepIndex];
 
-    // Mark current step running
     setSteps((prev) =>
       prev.map((step, idx) => (idx === currentStepIndex ? { ...step, status: 'running' } : step))
     );
@@ -187,19 +248,34 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
     const startMsg = `[${timeStr}] [INFO] Executing step [${currentStepIndex + 1}/${steps.length}]: ${currentStep.title}...`;
     setLogs((prev) => [...prev, { timestamp: timeStr, level: 'info', message: startMsg }]);
 
-    // Step duration simulation based on type
     let stepTime = 1200;
-    if (currentStep.type === 'package') stepTime = 2200;
-    if (currentStep.type === 'preflight') stepTime = 900;
+    if (currentStep.type === 'package') stepTime = 1800;
+    if (currentStep.type === 'preflight') stepTime = 700;
 
     const timeout = setTimeout(() => {
       const finishTimeStr = new Date().toLocaleTimeString();
       let successMsg = `[${finishTimeStr}] [SUCCESS] Completed: ${currentStep.title} (ExitCode 0)`;
 
-      if (currentStep.type === 'package') {
+      if (currentStep.id.startsWith('step-sys-')) {
+        const swId = currentStep.id.replace('step-sys-', '');
+        const matchingSwitch = systemSwitches.find((s) => s.id === swId);
+        if (swId === 'sw-rdp') {
+          successMsg = `[${finishTimeStr}] [SUCCESS] RDP enabled with NLA and Windows Firewall rule verified.`;
+        } else if (swId === 'sw-adgroup') {
+          const adGroup = switchParameters?.adAdminGroupName || systemConfig.adAdminGroupName;
+          successMsg = `[${finishTimeStr}] [SUCCESS] Delegated Local Administrators to AD group [${adGroup}].`;
+        } else if (swId === 'sw-power-screen' || swId === 'sw-power-standby') {
+          const scr = switchParameters?.screenTimeoutAc ?? systemConfig.screenTimeoutAc;
+          const stb = switchParameters?.standbyTimeoutAc ?? systemConfig.standbyTimeoutAc;
+          successMsg = `[${finishTimeStr}] [SUCCESS] Power plan active: Screen timeout ${scr}m, Standby ${stb}m.`;
+        } else if (matchingSwitch) {
+          successMsg = `[${finishTimeStr}] [SUCCESS] Applied custom task: ${matchingSwitch.title}.`;
+        }
+      } else if (currentStep.type === 'package') {
         const pkg = selectedPackages.find((p) => `step-pkg-${p.id}` === currentStep.id);
         if (pkg) {
-          successMsg = `[${finishTimeStr}] [SUCCESS] Silent install verified: ${pkg.name} via ${pkg.installerType} [Switches: ${pkg.silentArgs}]`;
+          const extra = packageCustomSwitches[pkg.id] || pkg.extraSwitches || '';
+          successMsg = `[${finishTimeStr}] [SUCCESS] Silent install verified: ${pkg.name} ${extra ? `[Extra switches: ${extra}]` : ''}`;
         }
       }
 
@@ -215,197 +291,161 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
     return () => clearTimeout(timeout);
   }, [isDeploying, isPaused, isFinished, currentStepIndex, steps.length]);
 
-  // Autoscroll terminal
+  // Auto-scroll terminal
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
-  const progressPercentage = steps.length > 0 ? Math.round((currentStepIndex / steps.length) * 100) : 0;
-
-  const formatTimer = (sec: number) => {
-    const mins = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${mins.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const handleRestart = () => {
+    setCurrentStepIndex(0);
+    setIsFinished(false);
+    setIsPaused(false);
+    setElapsedSeconds(0);
+    setLogs([]);
+    setSteps((prev) => prev.map((s) => ({ ...s, status: 'pending' })));
+    setIsDeploying(true);
   };
 
-  const copyAllLogs = () => {
-    const text = logs.map((l) => `${l.message}`).join('\n');
-    navigator.clipboard.writeText(text);
-    setCopiedLog(true);
-    setTimeout(() => setCopiedLog(false), 2000);
-  };
+  const completedStepsCount = steps.filter((s) => s.status === 'success').length;
+  const progressPercent = steps.length > 0 ? Math.round((completedStepsCount / steps.length) * 100) : 0;
 
-  const filteredLogs = logs.filter((l) => {
-    if (logFilter === 'errors') return l.level === 'error' || l.level === 'warn';
-    if (logFilter === 'success') return l.level === 'success';
+  const filteredLogs = logs.filter((log) => {
+    if (logFilter === 'errors') return log.level === 'error';
+    if (logFilter === 'success') return log.level === 'success';
     return true;
   });
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Runner Status Banner */}
+      {/* Cockpit Status Header */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div>
-            <div className="flex items-center space-x-3 mb-2">
-              <span className="text-xs font-mono px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
-                HOST: {machineName || 'CORP-WIN11-NEW'}
-              </span>
-              {isFinished ? (
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-950 border border-emerald-700 text-emerald-300 text-xs font-bold">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>PROVISIONING COMPLETED</span>
-                </span>
-              ) : isDeploying ? (
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-cyan-950 border border-cyan-700 text-cyan-300 text-xs font-bold animate-pulse">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-                  <span>LIVE EXECUTION RUNNING</span>
-                </span>
-              ) : (
-                <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-amber-950 border border-amber-700 text-amber-300 text-xs font-bold">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>READY / IDLE</span>
-                </span>
-              )}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2">
+              <span className={`w-3 h-3 rounded-full ${isDeploying ? 'bg-emerald-400 animate-ping' : isFinished ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
+              <h1 className="text-xl font-extrabold text-white">
+                Workstation Provisioning Execution Cockpit
+              </h1>
             </div>
-
-            <h1 className="text-2xl font-bold text-white tracking-tight">
-              Workstation Provisioning Execution Console
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Deploying {selectedPackages.length} silent packages from UNC share and executing {selectedChecklists.length} system configuration tasks.
+            <p className="text-xs text-slate-400">
+              Target Machine: <strong className="text-cyan-400 font-mono">{machineName || '$env:COMPUTERNAME'}</strong> • Customer:{' '}
+              <strong className="text-white">{customer.companyName}</strong> ({customer.domainName})
             </p>
           </div>
 
-          {/* Controls & Metrics */}
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-center min-w-[100px]">
-              <span className="text-[11px] text-slate-400 block uppercase font-mono">Elapsed</span>
-              <span className="text-lg font-mono font-bold text-white">{formatTimer(elapsedSeconds)}</span>
-            </div>
-
-            <div className="bg-slate-950 border border-slate-800 px-4 py-2.5 rounded-xl text-center min-w-[100px]">
-              <span className="text-[11px] text-slate-400 block uppercase font-mono">Progress</span>
-              <span className="text-lg font-mono font-bold text-cyan-400">{progressPercentage}%</span>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              {!isFinished && isDeploying && (
-                <button
-                  onClick={() => setIsPaused(!isPaused)}
-                  className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700"
-                >
-                  {isPaused ? <Play className="w-4 h-4 text-emerald-400" /> : <Pause className="w-4 h-4 text-amber-400" />}
-                  <span>{isPaused ? 'Resume' : 'Pause'}</span>
-                </button>
-              )}
-
-              {isFinished && (
-                <button
-                  onClick={onOpenAuditModal}
-                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20"
-                >
-                  <Award className="w-4 h-4" />
-                  <span>View Provisioning Certificate</span>
-                </button>
-              )}
-
+          {/* Action Controls */}
+          <div className="flex items-center space-x-3 self-start lg:self-auto">
+            {!isFinished && (
               <button
-                onClick={() => {
-                  setCurrentStepIndex(0);
-                  setIsFinished(false);
-                  setIsDeploying(true);
-                  setIsPaused(false);
-                  setLogs([]);
-                  setElapsedSeconds(0);
-                }}
-                className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700"
+                onClick={() => setIsPaused(!isPaused)}
+                className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  isPaused
+                    ? 'bg-emerald-950 border-emerald-800 text-emerald-300 hover:bg-emerald-900'
+                    : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                }`}
               >
-                <RotateCcw className="w-4 h-4 text-slate-400" />
-                <span>Re-Run</span>
+                {isPaused ? <Play className="w-4 h-4 fill-emerald-300" /> : <Pause className="w-4 h-4" />}
+                <span>{isPaused ? 'Resume Pipeline' : 'Pause Pipeline'}</span>
               </button>
-            </div>
+            )}
+
+            <button
+              onClick={handleRestart}
+              className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-semibold transition-all cursor-pointer"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Rerun Pipeline</span>
+            </button>
+
+            {isFinished && (
+              <button
+                onClick={onOpenAuditModal}
+                className="flex items-center space-x-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+              >
+                <Award className="w-4 h-4" />
+                <span>View Compliance Certificate</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Global Progress Bar */}
-        <div className="mt-6 pt-6 border-t border-slate-800">
-          <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-            <span>
-              Step {Math.min(currentStepIndex + 1, steps.length)} of {steps.length}:{' '}
-              <strong className="text-white">
-                {currentStepIndex < steps.length ? steps[currentStepIndex]?.title : 'All steps completed'}
-              </strong>
-            </span>
-            <span className="font-mono text-cyan-400 font-semibold">{progressPercentage}%</span>
+        {/* Progress Bar & Stats */}
+        <div className="mt-6 pt-5 border-t border-slate-800 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+          <div className="md:col-span-2 space-y-1.5">
+            <div className="flex justify-between text-slate-300 font-medium">
+              <span>Overall Provisioning Progress</span>
+              <span className="font-mono text-cyan-400 font-bold">{progressPercent}%</span>
+            </div>
+            <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+              <div
+                className="bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-500 h-full transition-all duration-300 ease-out"
+                style={{ width: `${progressPercent}%` }}
+              ></div>
+            </div>
           </div>
-          <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-800">
-            <div
-              className="bg-gradient-to-r from-cyan-500 via-blue-500 to-emerald-400 h-full rounded-full transition-all duration-300"
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
+
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400">Step Status:</span>
+            <span className="font-mono text-slate-200 font-bold">
+              {completedStepsCount} / {steps.length} Steps
+            </span>
+          </div>
+
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 flex items-center justify-between">
+            <span className="text-slate-400">Elapsed Time:</span>
+            <span className="font-mono text-emerald-400 font-bold">
+              {Math.floor(elapsedSeconds / 60)}m {elapsedSeconds % 60}s
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Main Runner Grid: Pipeline on Left, Terminal on Right */}
+      {/* Main Grid: Pipeline Step Timeline (Left) & Realtime PowerShell Terminal (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Step-by-Step Task Pipeline List */}
-        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-md flex flex-col h-[600px]">
+        {/* Left Column: Pipeline Execution Steps (5 cols) */}
+        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-md flex flex-col max-h-[640px]">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
-            <div className="flex items-center space-x-2">
+            <h3 className="text-sm font-bold text-white flex items-center space-x-2">
               <Layers className="w-4 h-4 text-cyan-400" />
-              <h2 className="text-sm font-semibold text-white">Execution Pipeline Sequence</h2>
-            </div>
-            <span className="text-xs text-slate-400 font-mono">
-              {steps.filter((s) => s.status === 'success').length}/{steps.length} Complete
+              <span>Deployment Task Pipeline</span>
+            </h3>
+            <span className="text-[11px] font-mono text-slate-400">
+              {steps.length} Tasks Queued
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+          <div className="space-y-2.5 overflow-y-auto flex-1 pr-1">
             {steps.map((step, idx) => {
-              const isActive = idx === currentStepIndex && isDeploying;
+              const isCurrent = idx === currentStepIndex && isDeploying;
               return (
                 <div
                   key={step.id}
-                  className={`p-3 rounded-lg border transition-all ${
-                    isActive
-                      ? 'bg-cyan-950/40 border-cyan-500/80 shadow-md'
-                      : step.status === 'success'
-                      ? 'bg-slate-950/60 border-emerald-900/40'
-                      : 'bg-slate-950/30 border-slate-800/60 opacity-80'
+                  className={`p-3 rounded-xl border transition-all text-xs flex items-start space-x-3 ${
+                    step.status === 'success'
+                      ? 'bg-emerald-950/20 border-emerald-800/60 text-slate-200'
+                      : isCurrent
+                      ? 'bg-cyan-950/40 border-cyan-500 shadow-md ring-1 ring-cyan-500/50'
+                      : 'bg-slate-950/60 border-slate-850 text-slate-400'
                   }`}
                 >
-                  <div className="flex items-start space-x-3">
-                    <div className="mt-0.5 shrink-0">
-                      {step.status === 'success' ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      ) : step.status === 'running' ? (
-                        <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <div className="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[10px] text-slate-500 font-mono">
-                          {idx + 1}
-                        </div>
-                      )}
-                    </div>
+                  <div className="mt-0.5 shrink-0">
+                    {step.status === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                    {isCurrent && (
+                      <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    {step.status === 'pending' && <Circle className="w-4 h-4 text-slate-600" />}
+                  </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-white truncate">{step.title}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded font-mono uppercase ${
-                            step.status === 'success'
-                              ? 'text-emerald-300 bg-emerald-950'
-                              : step.status === 'running'
-                              ? 'text-cyan-300 bg-cyan-950 animate-pulse'
-                              : 'text-slate-500 bg-slate-900'
-                          }`}
-                        >
-                          {step.status}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">{step.subtext}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                      <span className={`font-semibold truncate ${isCurrent ? 'text-cyan-300' : 'text-white'}`}>
+                        {step.title}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-500 uppercase shrink-0">
+                        {step.type}
+                      </span>
                     </div>
+                    <p className="text-[11px] text-slate-400 truncate font-mono">{step.subtext}</p>
                   </div>
                 </div>
               );
@@ -413,97 +453,53 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
           </div>
         </div>
 
-        {/* Live PowerShell Console Terminal */}
-        <div className="lg:col-span-7 bg-slate-950 border border-slate-800 rounded-xl flex flex-col h-[600px] shadow-lg font-mono">
-          {/* Terminal Title Bar */}
-          <div className="bg-slate-900 px-4 py-3 rounded-t-xl border-b border-slate-800 flex items-center justify-between">
+        {/* Right Column: Live PowerShell Console Stream (7 cols) */}
+        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-md flex flex-col max-h-[640px]">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
             <div className="flex items-center space-x-2">
-              <div className="flex space-x-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-                <div className="w-3 h-3 rounded-full bg-emerald-500/80"></div>
-              </div>
-              <span className="text-xs text-slate-300 font-medium ml-2 flex items-center space-x-1.5">
-                <Terminal className="w-3.5 h-3.5 text-cyan-400" />
-                <span>PowerShell Terminal (Administrator) — Live Output</span>
-              </span>
+              <Terminal className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-sm font-bold text-white">Live PowerShell Execution Stream</h3>
             </div>
 
             <div className="flex items-center space-x-2">
-              {/* Filter */}
-              <div className="flex text-[11px] bg-slate-950 p-0.5 rounded border border-slate-800">
-                <button
-                  onClick={() => setLogFilter('all')}
-                  className={`px-2 py-0.5 rounded ${logFilter === 'all' ? 'bg-slate-800 text-white' : 'text-slate-400'}`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setLogFilter('success')}
-                  className={`px-2 py-0.5 rounded ${logFilter === 'success' ? 'bg-slate-800 text-emerald-400' : 'text-slate-400'}`}
-                >
-                  Pass
-                </button>
-                <button
-                  onClick={() => setLogFilter('errors')}
-                  className={`px-2 py-0.5 rounded ${logFilter === 'errors' ? 'bg-slate-800 text-red-400' : 'text-slate-400'}`}
-                >
-                  Warn
-                </button>
-              </div>
-
               <button
-                onClick={copyAllLogs}
-                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors"
-                title="Copy terminal logs"
+                onClick={() => {
+                  navigator.clipboard.writeText(logs.map((l) => l.message).join('\n'));
+                  setCopiedLog(true);
+                  setTimeout(() => setCopiedLog(false), 2000);
+                }}
+                className="text-[11px] px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center space-x-1 cursor-pointer"
               >
-                {copiedLog ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedLog ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{copiedLog ? 'Copied' : 'Copy'}</span>
               </button>
             </div>
           </div>
 
-          {/* Terminal Body */}
-          <div className="flex-1 p-4 overflow-y-auto text-xs leading-relaxed space-y-1 bg-slate-950 text-slate-300">
-            <div className="text-slate-500 text-[11px] pb-2 border-b border-slate-900">
-              Microsoft Windows [Version 10.0.22631.3880]
-              <br />
-              (c) Microsoft Corporation. AutoPC Zero-Touch Workstation Deployment Hook initialized.
+          {/* Console Container */}
+          <div className="flex-1 bg-slate-950 border border-slate-850 rounded-xl p-4 font-mono text-xs overflow-y-auto leading-relaxed space-y-1.5 selection:bg-cyan-600 selection:text-white">
+            <div className="text-slate-500 pb-1 border-b border-slate-850">
+              # AutoPC Deployment Session: {customer.companyName} [{machineName || '$env:COMPUTERNAME'}]
             </div>
 
-            {filteredLogs.length === 0 ? (
-              <div className="text-slate-600 italic py-4">Waiting for execution instructions...</div>
-            ) : (
-              filteredLogs.map((log, i) => (
-                <div
-                  key={i}
-                  className={`font-mono text-[11px] ${
-                    log.level === 'success'
-                      ? 'text-emerald-400'
-                      : log.level === 'warn'
-                      ? 'text-yellow-400'
-                      : log.level === 'error'
-                      ? 'text-red-400'
-                      : 'text-slate-300'
-                  }`}
-                >
-                  {log.message}
-                </div>
-              ))
-            )}
-
-            {isDeploying && !isFinished && (
-              <div className="flex items-center space-x-2 text-cyan-400 text-[11px] animate-pulse">
-                <span>&gt; Processing UNC stream: \\corp-fs01\deployments...</span>
+            {filteredLogs.map((log, index) => (
+              <div
+                key={index}
+                className={`${
+                  log.level === 'success'
+                    ? 'text-emerald-400'
+                    : log.level === 'warn'
+                    ? 'text-yellow-400'
+                    : log.level === 'error'
+                    ? 'text-red-400'
+                    : 'text-cyan-300/90'
+                }`}
+              >
+                {log.message}
               </div>
-            )}
+            ))}
 
             <div ref={terminalEndRef} />
-          </div>
-
-          {/* Terminal Footer */}
-          <div className="bg-slate-900/60 px-4 py-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-            <span>Log destination: C:\ProgramData\PCSetup\Logs\Master_Provisioning.log</span>
-            <span>Encoding: UTF-8</span>
           </div>
         </div>
       </div>

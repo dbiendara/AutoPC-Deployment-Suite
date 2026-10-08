@@ -1,22 +1,19 @@
 import React, { useState, useMemo } from 'react';
 import {
   SoftwarePackage,
-  ChecklistItem,
-  RoleProfile,
+  CustomerProfile,
+  SystemConfigSettings,
+  SystemConfigSwitch,
 } from '../types';
 import {
   Monitor,
   CheckCircle2,
   Circle,
   Play,
-  Code2,
   HardDrive,
-  User,
-  Building,
-  Hash,
-  ShieldCheck,
+  Building2,
+  Users,
   Search,
-  Filter,
   Clock,
   Sparkles,
   Server,
@@ -30,72 +27,103 @@ import {
   Check,
   Info,
   Sliders,
+  FileCode,
+  ShieldAlert,
+  Moon,
+  Sun,
+  Edit3,
+  Plus,
+  Trash2,
+  FilePlus,
+  ShieldCheck,
+  FolderOpen,
 } from 'lucide-react';
 
 interface NewPCWizardProps {
   packages: SoftwarePackage[];
-  checklists: ChecklistItem[];
-  profiles: RoleProfile[];
+  customers: CustomerProfile[];
   machineName: string;
   setMachineName: (name: string) => void;
-  employeeName: string;
-  setEmployeeName: (name: string) => void;
-  employeeEmail: string;
-  setEmployeeEmail: (email: string) => void;
-  department: string;
-  setDepartment: (dept: string) => void;
-  serialNumber: string;
-  setSerialNumber: (sn: string) => void;
+  selectedCustomerId: string;
+  setSelectedCustomerId: (id: string) => void;
   selectedPackageIds: string[];
   setSelectedPackageIds: React.Dispatch<React.SetStateAction<string[]>>;
-  selectedChecklistIds: string[];
-  setSelectedChecklistIds: React.Dispatch<React.SetStateAction<string[]>>;
-  activeProfileId: string;
-  setActiveProfileId: (id: string) => void;
+  packageCustomSwitches: Record<string, string>;
+  setPackageCustomSwitches: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  packageConfigFiles: Record<string, string>;
+  setPackageConfigFiles: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  systemConfig: SystemConfigSettings;
+  setSystemConfig: React.Dispatch<React.SetStateAction<SystemConfigSettings>>;
+  systemSwitches: SystemConfigSwitch[];
+  enabledSwitchIds: string[];
+  setEnabledSwitchIds: React.Dispatch<React.SetStateAction<string[]>>;
+  switchParameters: Record<string, string | number>;
+  setSwitchParameters: React.Dispatch<React.SetStateAction<Record<string, string | number>>>;
+  onOpenSystemConfigManager: () => void;
+  onDeleteSwitch: (id: string) => void;
+  onOpenManualPackageModal: () => void;
   onStartDeployment: () => void;
   onOpenScriptModal: () => void;
 }
 
 export const NewPCWizard: React.FC<NewPCWizardProps> = ({
   packages,
-  checklists,
-  profiles,
+  customers,
   machineName,
   setMachineName,
-  employeeName,
-  setEmployeeName,
-  employeeEmail,
-  setEmployeeEmail,
-  department,
-  setDepartment,
-  serialNumber,
-  setSerialNumber,
+  selectedCustomerId,
+  setSelectedCustomerId,
   selectedPackageIds,
   setSelectedPackageIds,
-  selectedChecklistIds,
-  setSelectedChecklistIds,
-  activeProfileId,
-  setActiveProfileId,
+  packageCustomSwitches,
+  setPackageCustomSwitches,
+  packageConfigFiles,
+  setPackageConfigFiles,
+  systemConfig,
+  setSystemConfig,
+  systemSwitches,
+  enabledSwitchIds,
+  setEnabledSwitchIds,
+  switchParameters,
+  setSwitchParameters,
+  onOpenSystemConfigManager,
+  onDeleteSwitch,
+  onOpenManualPackageModal,
   onStartDeployment,
   onOpenScriptModal,
 }) => {
   const [packageSearch, setPackageSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
-  const [expandedChecklist, setExpandedChecklist] = useState<string | null>(null);
-  const [expandedPackage, setExpandedPackage] = useState<string | null>(null);
+  const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
 
-  // Auto-generate standardized computer hostname
-  const generateHostname = () => {
-    const deptPrefix = department ? department.substring(0, 3).toUpperCase() : 'CORP';
-    const randomNum = Math.floor(100 + Math.random() * 900);
-    setMachineName(`${deptPrefix}-W11-${randomNum}`);
-  };
+  // Selected customer profile
+  const currentCustomer = useMemo(() => {
+    return customers.find((c) => c.id === selectedCustomerId) || customers[0];
+  }, [customers, selectedCustomerId]);
 
-  // Profile selection handler
-  const handleSelectProfile = (profile: RoleProfile) => {
-    setActiveProfileId(profile.id);
-    setSelectedPackageIds(profile.packageIds);
-    setSelectedChecklistIds(profile.checklistIds);
+  // Handle switching customer profile
+  const handleSelectCustomer = (customer: CustomerProfile) => {
+    setSelectedCustomerId(customer.id);
+    setSelectedPackageIds(customer.packageIds || []);
+    if (customer.packageCustomSwitches) {
+      setPackageCustomSwitches(customer.packageCustomSwitches);
+    }
+    if (customer.packageConfigFiles) {
+      setPackageConfigFiles(customer.packageConfigFiles);
+    }
+    setSystemConfig((prev) => ({
+      ...prev,
+      enableRdp: customer.enableRdp,
+      adAdminGroupName: customer.defaultAdAdminGroup,
+      screenTimeoutAc: customer.powerPlanSettings.screenTimeoutAc,
+      standbyTimeoutAc: customer.powerPlanSettings.standbyTimeoutAc,
+    }));
+    setSwitchParameters((prev) => ({
+      ...prev,
+      adAdminGroupName: customer.defaultAdAdminGroup,
+      screenTimeoutAc: customer.powerPlanSettings.screenTimeoutAc,
+      standbyTimeoutAc: customer.powerPlanSettings.standbyTimeoutAc,
+    }));
   };
 
   // Toggle package
@@ -105,11 +133,35 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
     );
   };
 
-  // Toggle checklist item
-  const toggleChecklist = (chkId: string) => {
-    setSelectedChecklistIds((prev) =>
-      prev.includes(chkId) ? prev.filter((id) => id !== chkId) : [...prev, chkId]
+  // Toggle switch
+  const toggleSwitch = (switchId: string) => {
+    const isEnabling = !enabledSwitchIds.includes(switchId);
+    setEnabledSwitchIds((prev) =>
+      isEnabling ? [...prev, switchId] : prev.filter((id) => id !== switchId)
     );
+
+    // Keep systemConfig in sync
+    if (switchId === 'sw-rdp') {
+      setSystemConfig((prev) => ({ ...prev, enableRdp: isEnabling }));
+    } else if (switchId === 'sw-adgroup') {
+      setSystemConfig((prev) => ({ ...prev, addAdGroupToAdmins: isEnabling }));
+    } else if (switchId === 'sw-power-screen' || switchId === 'sw-power-standby') {
+      setSystemConfig((prev) => ({ ...prev, setPowerPlan: isEnabling }));
+    }
+  };
+
+  // Update parameter value for a switch
+  const handleParamChange = (key: string, value: string | number) => {
+    setSwitchParameters((prev) => ({ ...prev, [key]: value }));
+
+    // Keep legacy systemConfig in sync
+    if (key === 'adAdminGroupName') {
+      setSystemConfig((prev) => ({ ...prev, adAdminGroupName: String(value) }));
+    } else if (key === 'screenTimeoutAc') {
+      setSystemConfig((prev) => ({ ...prev, screenTimeoutAc: Number(value) }));
+    } else if (key === 'standbyTimeoutAc') {
+      setSystemConfig((prev) => ({ ...prev, standbyTimeoutAc: Number(value) }));
+    }
   };
 
   // Categories list
@@ -124,7 +176,8 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
       const matchesSearch =
         pkg.name.toLowerCase().includes(packageSearch.toLowerCase()) ||
         pkg.fileName.toLowerCase().includes(packageSearch.toLowerCase()) ||
-        pkg.description.toLowerCase().includes(packageSearch.toLowerCase());
+        pkg.description.toLowerCase().includes(packageSearch.toLowerCase()) ||
+        (pkg.extraSwitches && pkg.extraSwitches.toLowerCase().includes(packageSearch.toLowerCase()));
       const matchesCategory = categoryFilter === 'All' || pkg.category === categoryFilter;
       return matchesSearch && matchesCategory;
     });
@@ -135,158 +188,111 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
     const packageTime = packages
       .filter((p) => selectedPackageIds.includes(p.id))
       .reduce((acc, p) => acc + (p.estimatedMinutes || 2), 0);
-    const checklistTime = selectedChecklistIds.length * 0.5; // ~30 sec per checklist task
-    return Math.ceil(packageTime + checklistTime);
-  }, [packages, selectedPackageIds, selectedChecklistIds]);
+    return Math.ceil(packageTime + 1); // ~1 min for system config
+  }, [packages, selectedPackageIds]);
 
   return (
     <div className="space-y-8 pb-12">
-      {/* Hero Setup Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-950/80 border border-cyan-800/80 text-cyan-300 text-xs font-semibold mb-3">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Automated Onboarding & Provisioning Engine</span>
+      {/* Top Banner: Local Active Directory Environment */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-800/80 text-emerald-300 text-xs font-semibold mb-2">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Active Directory Member PC • Hostname Configured</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              Workstation Onboarding & Software Deployment
+            </h1>
+            <p className="mt-1 text-slate-300 text-xs sm:text-sm">
+              Select the customer company profile, verify automated system configuration switches, and execute silent software installations from UNC shares.
+            </p>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Provision New Workstation
-          </h1>
-          <p className="mt-2 text-slate-300 text-sm leading-relaxed">
-            Configure this PC in minutes. Select the employee role to apply recommended software packages from the corporate UNC network share and automate system configurations silently.
-          </p>
+
+          <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl text-xs space-y-1.5 shrink-0 min-w-[250px]">
+            <div className="flex items-center justify-between text-slate-400">
+              <span>Local Hostname:</span>
+              <input
+                type="text"
+                value={machineName}
+                onChange={(e) => setMachineName(e.target.value)}
+                className="bg-slate-900 text-white font-mono px-2 py-0.5 rounded border border-slate-700 text-xs w-36 text-right focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div className="flex items-center justify-between text-slate-400">
+              <span>Customer:</span>
+              <span className="text-cyan-400 font-semibold truncate max-w-[150px]">{currentCustomer?.companyName}</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-400">
+              <span>AD Domain:</span>
+              <span className="text-slate-300 font-mono">{currentCustomer?.domainName}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Step 1: Machine Identity & Employee Assignment */}
+      {/* Step 1: Customer / Company Profiles Selection */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-lg bg-cyan-900/60 text-cyan-400 flex items-center justify-center font-bold text-sm">
               1
             </div>
             <div>
-              <h2 className="text-base font-semibold text-white">Target Machine & Assignee Details</h2>
-              <p className="text-xs text-slate-400">Identify this PC for corporate asset register & logs</p>
-            </div>
-          </div>
-          <button
-            onClick={generateHostname}
-            className="flex items-center space-x-1.5 text-xs text-cyan-400 hover:text-cyan-300 font-medium px-2.5 py-1.5 rounded-lg bg-cyan-950/60 border border-cyan-800/60 transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Auto-Gen Hostname</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center space-x-1.5">
-              <HardDrive className="w-3.5 h-3.5 text-slate-400" />
-              <span>Computer Hostname</span>
-            </label>
-            <input
-              type="text"
-              value={machineName}
-              onChange={(e) => setMachineName(e.target.value)}
-              placeholder="e.g. CORP-ENG-LPT042"
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center space-x-1.5">
-              <User className="w-3.5 h-3.5 text-slate-400" />
-              <span>Employee Name</span>
-            </label>
-            <input
-              type="text"
-              value={employeeName}
-              onChange={(e) => setEmployeeName(e.target.value)}
-              placeholder="e.g. Sarah Jenkins"
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center space-x-1.5">
-              <Building className="w-3.5 h-3.5 text-slate-400" />
-              <span>Department</span>
-            </label>
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
-            >
-              <option value="Engineering">Software Engineering</option>
-              <option value="Design">Product & UX Design</option>
-              <option value="Finance">Finance & Accounting</option>
-              <option value="HR">People & HR</option>
-              <option value="Operations">Operations & Logistics</option>
-              <option value="IT Systems">IT & Security Systems</option>
-              <option value="Executive">Executive Leadership</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5 flex items-center space-x-1.5">
-              <Hash className="w-3.5 h-3.5 text-slate-400" />
-              <span>Hardware Serial / Asset Tag</span>
-            </label>
-            <input
-              type="text"
-              value={serialNumber}
-              onChange={(e) => setSerialNumber(e.target.value)}
-              placeholder="e.g. 5CG2490X1P"
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Step 2: Role Profile Presets */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-900/60 text-blue-400 flex items-center justify-center font-bold text-sm">
-              2
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-white">Select Role Profile Template</h2>
-              <p className="text-xs text-slate-400">Pre-populates required apps & system checklists with 1 click</p>
+              <h2 className="text-base font-semibold text-white">Select Customer / Company Profile</h2>
+              <p className="text-xs text-slate-400">
+                Applies client-specific active directory admin delegation, default software packages, and installer parameters
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {profiles.map((profile) => {
-            const isSelected = activeProfileId === profile.id;
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {customers.map((cust) => {
+            const isSelected = selectedCustomerId === cust.id;
             return (
               <button
-                key={profile.id}
-                onClick={() => handleSelectProfile(profile)}
-                className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between ${
+                key={cust.id}
+                onClick={() => handleSelectCustomer(cust)}
+                className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between cursor-pointer ${
                   isSelected
-                    ? 'bg-cyan-950/40 border-cyan-500 shadow-md shadow-cyan-500/10'
+                    ? 'bg-cyan-950/40 border-cyan-500 shadow-md shadow-cyan-500/10 ring-1 ring-cyan-500'
                     : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/40'
                 }`}
               >
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-semibold text-white">{profile.name}</span>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <Building2 className={`w-4 h-4 ${isSelected ? 'text-cyan-400' : 'text-slate-400'}`} />
+                      <span className="text-sm font-bold text-white line-clamp-1">{cust.companyName}</span>
+                    </div>
                     {isSelected ? (
-                      <CheckCircle2 className="w-4 h-4 text-cyan-400" />
+                      <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                     ) : (
-                      <Circle className="w-4 h-4 text-slate-600" />
+                      <Circle className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
                     )}
                   </div>
-                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                    {profile.description}
+
+                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-3">
+                    {cust.notes || `Configured for ${cust.domainName}`}
                   </p>
                 </div>
 
-                <div className="mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>{profile.packageIds.length} Packages</span>
-                  <span>{profile.checklistIds.length} Tasks</span>
+                <div className="pt-2.5 border-t border-slate-800/80 text-[11px] space-y-1 text-slate-400">
+                  <div className="flex items-center justify-between">
+                    <span>Domain:</span>
+                    <span className="font-mono text-slate-300">{cust.domainName}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Admin Group:</span>
+                    <span className="font-mono text-cyan-400 truncate max-w-[140px]" title={cust.defaultAdAdminGroup}>
+                      {cust.defaultAdAdminGroup.split('\\')[1] || cust.defaultAdAdminGroup}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Default Software:</span>
+                    <span className="text-emerald-400 font-semibold">{cust.packageIds?.length || 0} packages</span>
+                  </div>
                 </div>
               </button>
             );
@@ -294,50 +300,185 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
         </div>
       </div>
 
-      {/* Step 3: Software Packages to Install from UNC */}
+      {/* Step 2: System Configuration Checklist & Switch Management */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800 mb-5">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-lg bg-purple-900/60 text-purple-400 flex items-center justify-center font-bold text-sm">
+              2
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-base font-semibold text-white">System Configuration Switches</h2>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950 border border-purple-800/70 text-purple-300 font-medium">
+                  {enabledSwitchIds.length} Active
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Enable, customize, or add new PowerShell workstation configuration tasks
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2 self-start sm:self-auto">
+            <button
+              onClick={onOpenSystemConfigManager}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-purple-300 hover:text-white border border-purple-800/50 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <Sliders className="w-3.5 h-3.5 text-purple-400" />
+              <span>Manage / Add Switches</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Dynamic Grid of System Configuration Switches */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {systemSwitches.map((sw) => {
+            const isEnabled = enabledSwitchIds.includes(sw.id);
+            const paramVal = switchParameters[sw.parameterKey || ''] ?? sw.parameterDefaultValue;
+
+            return (
+              <div
+                key={sw.id}
+                className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
+                  isEnabled
+                    ? 'bg-slate-950/80 border-purple-500/60 shadow-sm'
+                    : 'bg-slate-950/30 border-slate-800/80 opacity-70'
+                }`}
+              >
+                <div>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <label className="text-xs font-bold text-white flex items-center space-x-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        onChange={() => toggleSwitch(sw.id)}
+                        className="rounded border-slate-700 text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer"
+                      />
+                      <span className="leading-tight">{sw.title}</span>
+                    </label>
+
+                    {sw.isRemovable && (
+                      <button
+                        onClick={() => onDeleteSwitch(sw.id)}
+                        className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors shrink-0"
+                        title="Remove custom switch"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+                    {sw.description}
+                  </p>
+                </div>
+
+                {/* Parameter Input if applicable and switch is enabled */}
+                {sw.hasParameter && sw.parameterKey && (
+                  <div className="pt-2 border-t border-slate-850 mt-1">
+                    <label className="block text-[10px] text-slate-400 uppercase font-mono mb-1">
+                      {sw.parameterLabel || sw.parameterKey}:
+                    </label>
+
+                    {sw.parameterType === 'select' && sw.parameterOptions ? (
+                      <select
+                        value={paramVal}
+                        onChange={(e) =>
+                          handleParamChange(
+                            sw.parameterKey!,
+                            isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value)
+                          )
+                        }
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white focus:outline-none focus:border-purple-500"
+                      >
+                        {sw.parameterOptions.map((opt) => (
+                          <option key={opt.label} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type={sw.parameterType === 'number' ? 'number' : 'text'}
+                        value={paramVal || ''}
+                        onChange={(e) => handleParamChange(sw.parameterKey!, e.target.value)}
+                        placeholder={`e.g. ${sw.parameterDefaultValue || ''}`}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-mono focus:outline-none focus:border-purple-500"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Quick "+ Add New Switch" Card */}
+          <button
+            onClick={onOpenSystemConfigManager}
+            className="p-4 rounded-xl border border-dashed border-slate-800 hover:border-purple-500/70 hover:bg-slate-900/60 transition-all text-slate-400 hover:text-purple-300 flex flex-col items-center justify-center space-y-2 min-h-[140px] cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-full bg-slate-950 border border-slate-800 flex items-center justify-center text-purple-400">
+              <Plus className="w-4 h-4" />
+            </div>
+            <span className="text-xs font-semibold">Add New Switch</span>
+            <span className="text-[10px] text-slate-500">Custom PowerShell task or registry key</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Step 3: Software Packages Selection with Extra Switches & Config File Import */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800 mb-5">
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-900/60 text-emerald-400 flex items-center justify-center font-bold text-sm">
               3
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <h2 className="text-base font-semibold text-white">Software Packages (UNC Silent Deployment)</h2>
+                <h2 className="text-base font-semibold text-white">Software Packages & Extra Installer Switches</h2>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800/70 text-emerald-300 font-medium">
                   {selectedPackageIds.length} Selected
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Software binaries stored on <code className="text-cyan-400">\\corp-fs01\deployments</code> and silently installed
+                Silent deployment from UNC shares with custom configuration files and extra switches (e.g. TeamViewer Host tokens)
               </p>
             </div>
           </div>
 
-          {/* Quick Select Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 self-start sm:self-auto">
+            {/* Quick Manual Add Button right in the wizard */}
+            <button
+              onClick={onOpenManualPackageModal}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-800/60 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Add Package Manually</span>
+            </button>
+
             <button
               onClick={() => setSelectedPackageIds(packages.map((p) => p.id))}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
             >
               Select All
             </button>
             <button
               onClick={() => setSelectedPackageIds([])}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
             >
               Clear
             </button>
           </div>
         </div>
 
-        {/* Filter & Search Bar */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        {/* Search & Categories */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Search packages, filename, installer type..."
+              placeholder="Search software, UNC file, or extra switches..."
               value={packageSearch}
               onChange={(e) => setPackageSearch(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
@@ -349,10 +490,10 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
-                className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                   categoryFilter === cat
-                    ? 'bg-cyan-600 text-white font-medium'
-                    : 'bg-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                    ? 'bg-cyan-600 text-white font-semibold'
+                    : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
                 {cat}
@@ -361,24 +502,29 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
           </div>
         </div>
 
-        {/* Package Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
+        {/* Packages Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredPackages.map((pkg) => {
             const isSelected = selectedPackageIds.includes(pkg.id);
-            const isExpanded = expandedPackage === pkg.id;
+            const extraSwitches = packageCustomSwitches[pkg.id] || pkg.extraSwitches;
+            const configFile = packageConfigFiles[pkg.id] || pkg.configFileImport?.configFileName;
+            const isEditing = editingPackageId === pkg.id;
 
             return (
               <div
                 key={pkg.id}
                 className={`rounded-xl border transition-all ${
                   isSelected
-                    ? 'bg-slate-950/80 border-cyan-500/70 shadow-sm shadow-cyan-500/10'
-                    : 'bg-slate-950/40 border-slate-800 hover:border-slate-700'
+                    ? 'bg-slate-950/90 border-cyan-500/80 shadow-md ring-1 ring-cyan-500/20'
+                    : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'
                 }`}
               >
                 <div className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 cursor-pointer" onClick={() => togglePackage(pkg.id)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div
+                      onClick={() => togglePackage(pkg.id)}
+                      className="flex items-start space-x-3 cursor-pointer flex-1 select-none"
+                    >
                       <div className="mt-0.5">
                         {isSelected ? (
                           <CheckCircle2 className="w-5 h-5 text-cyan-400" />
@@ -388,60 +534,110 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
                       </div>
                       <div>
                         <div className="flex items-center space-x-2">
-                          <h3 className="text-sm font-semibold text-white">{pkg.name}</h3>
-                          <span className="text-[11px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
+                          <h3 className="text-sm font-bold text-white">{pkg.name}</h3>
+                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
                             v{pkg.version}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1 line-clamp-1">{pkg.description}</p>
+                        <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{pkg.description}</p>
                       </div>
                     </div>
 
-                    <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-medium">
-                      {pkg.category}
-                    </span>
-                  </div>
-
-                  {/* UNC Path & Silent Tag */}
-                  <div className="mt-3 pt-3 border-t border-slate-850 flex items-center justify-between text-xs">
-                    <div className="flex items-center space-x-1.5 text-slate-400 font-mono text-[11px] truncate max-w-[280px]">
-                      <Server className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                      <span className="truncate">{pkg.uncPath}\{pkg.fileName}</span>
-                    </div>
-
-                    <div className="flex items-center space-x-2 shrink-0">
-                      <span className="px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 font-mono text-[10px] border border-blue-900">
+                    <div className="flex items-center space-x-1 shrink-0">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
                         {pkg.installerType}
                       </span>
-                      <button
-                        onClick={() => setExpandedPackage(isExpanded ? null : pkg.id)}
-                        className="text-slate-400 hover:text-white"
-                      >
-                        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                      </button>
                     </div>
                   </div>
 
-                  {/* Expanded Technical Details */}
-                  {isExpanded && (
-                    <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2 text-xs">
-                      <div>
-                        <span className="text-slate-400 text-[11px] block mb-1">Silent Arguments:</span>
-                        <code className="block bg-slate-900 p-2 rounded border border-slate-800 text-emerald-300 font-mono text-[11px] break-all">
-                          {pkg.silentArgs}
+                  {/* UNC Path & Est Time */}
+                  <div className="mt-2.5 pt-2 border-t border-slate-850 flex items-center justify-between text-[11px] text-slate-400">
+                    <div className="flex items-center space-x-1.5 font-mono truncate max-w-[280px]">
+                      <FolderOpen className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="truncate" title={`${pkg.uncPath}\\${pkg.fileName}`}>
+                        {pkg.uncPath}\{pkg.fileName}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-1 shrink-0 text-slate-400">
+                      <Clock className="w-3 h-3" />
+                      <span>{pkg.estimatedMinutes}m</span>
+                    </div>
+                  </div>
+
+                  {/* Badges for Extra Switches and Config File */}
+                  {(extraSwitches || configFile) && (
+                    <div className="mt-2.5 pt-2 border-t border-slate-850/80 space-y-1.5 text-[11px]">
+                      {extraSwitches && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400 font-mono">Extra Switches:</span>
+                          <button
+                            onClick={() => setEditingPackageId(isEditing ? null : pkg.id)}
+                            className="text-cyan-400 hover:text-cyan-300 flex items-center space-x-1"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Customize</span>
+                          </button>
+                        </div>
+                      )}
+                      {extraSwitches && (
+                        <code className="block bg-slate-900 border border-slate-800 p-1.5 rounded text-[10px] text-emerald-300 font-mono truncate">
+                          {extraSwitches}
                         </code>
+                      )}
+
+                      {configFile && (
+                        <div className="flex items-center space-x-1.5 text-slate-400 text-[10px] font-mono">
+                          <FileCode className="w-3 h-3 text-cyan-400 shrink-0" />
+                          <span>Config File Import:</span>
+                          <span className="text-cyan-300 truncate">{configFile}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Inline Parameter Customizer */}
+                  {isEditing && (
+                    <div className="mt-3 p-3 bg-slate-900 rounded-lg border border-cyan-500/50 space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-white">Installer Parameter Override:</span>
+                        <button
+                          onClick={() => setEditingPackageId(null)}
+                          className="text-slate-400 hover:text-white"
+                        >
+                          Done
+                        </button>
                       </div>
                       <div>
-                        <span className="text-slate-400 text-[11px] block mb-1">Detection Rule:</span>
-                        <code className="block bg-slate-900 p-1.5 rounded border border-slate-800 text-slate-300 font-mono text-[11px] truncate">
-                          {pkg.detectionRule}
-                        </code>
+                        <label className="block text-[10px] text-slate-400 mb-1 font-mono">Extra Switches:</label>
+                        <input
+                          type="text"
+                          value={packageCustomSwitches[pkg.id] || pkg.extraSwitches || ''}
+                          onChange={(e) =>
+                            setPackageCustomSwitches((prev) => ({
+                              ...prev,
+                              [pkg.id]: e.target.value,
+                            }))
+                          }
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-emerald-300 font-mono focus:outline-none focus:border-cyan-500"
+                        />
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span>Exit Codes: [{pkg.successExitCodes.join(', ')}]</span>
-                        <span>Reboot: {pkg.rebootBehavior}</span>
-                        <span>Est. Duration: ~{pkg.estimatedMinutes} min</span>
-                      </div>
+                      {pkg.configFileImport?.enabled && (
+                        <div>
+                          <label className="block text-[10px] text-slate-400 mb-1 font-mono">Config File Path:</label>
+                          <input
+                            type="text"
+                            value={packageConfigFiles[pkg.id] || pkg.configFileImport.configUncPath || ''}
+                            onChange={(e) =>
+                              setPackageConfigFiles((prev) => ({
+                                ...prev,
+                                [pkg.id]: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-cyan-300 font-mono focus:outline-none focus:border-cyan-500"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -451,152 +647,38 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
         </div>
       </div>
 
-      {/* Step 4: System Configuration Checklist */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800 mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-900/60 text-purple-400 flex items-center justify-center font-bold text-sm">
-              4
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h2 className="text-base font-semibold text-white">System Configuration Checklist</h2>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950 border border-purple-800/70 text-purple-300 font-medium">
-                  {selectedChecklistIds.length} Tasks Active
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Automated PowerShell tasks executed before software deployments
-              </p>
-            </div>
+      {/* Execution Launcher Bar */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center space-x-2 mb-1">
+            <ShieldCheck className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-base font-bold text-white">Ready for Workstation Provisioning</h3>
           </div>
-
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setSelectedChecklistIds(checklists.map((c) => c.id))}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-            >
-              Select All Tasks
-            </button>
-            <button
-              onClick={() => setSelectedChecklistIds([])}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 transition-colors"
-            >
-              Clear
-            </button>
-          </div>
+          <p className="text-xs text-slate-300">
+            Target Host: <strong className="text-white font-mono">{machineName}</strong> • Profile:{' '}
+            <strong className="text-cyan-400">{currentCustomer?.companyName}</strong> •{' '}
+            <strong className="text-emerald-400">{selectedPackageIds.length} Packages</strong> •{' '}
+            <strong className="text-purple-400">{enabledSwitchIds.length} Switches</strong> • ~{totalEstimatedMinutes} min estimated
+          </p>
         </div>
 
-        <div className="space-y-3">
-          {checklists.map((chk) => {
-            const isSelected = selectedChecklistIds.includes(chk.id);
-            const isExpanded = expandedChecklist === chk.id;
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onOpenScriptModal}
+            className="flex items-center space-x-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 text-xs font-semibold transition-all cursor-pointer"
+          >
+            <FileCode className="w-4 h-4 text-cyan-400" />
+            <span>Generate PowerShell Script</span>
+          </button>
 
-            return (
-              <div
-                key={chk.id}
-                className={`rounded-xl border transition-all ${
-                  isSelected
-                    ? 'bg-slate-950/70 border-slate-700'
-                    : 'bg-slate-950/30 border-slate-800/60'
-                }`}
-              >
-                <div className="p-3.5 flex items-center justify-between">
-                  <div className="flex items-center space-x-3 cursor-pointer flex-1" onClick={() => toggleChecklist(chk.id)}>
-                    <div>
-                      {isSelected ? (
-                        <CheckCircle2 className="w-4 h-4 text-purple-400" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-slate-600" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-xs font-semibold text-white">{chk.title}</span>
-                        {chk.requiresReboot && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-950 border border-amber-800/60 text-amber-300">
-                            Reboot Pending
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-400">{chk.description}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-3 ml-4">
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
-                      {chk.category}
-                    </span>
-                    <button
-                      onClick={() => setExpandedChecklist(isExpanded ? null : chk.id)}
-                      className="text-slate-400 hover:text-white"
-                    >
-                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="px-4 pb-3 pt-1 border-t border-slate-850 space-y-2">
-                    <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-mono">PowerShell Implementation:</span>
-                      <pre className="mt-1 bg-slate-900 p-2 rounded text-slate-300 font-mono text-[11px] overflow-x-auto border border-slate-800">
-                        {chk.powershellCommand.replace(/\{\{HOSTNAME\}\}/g, machineName || 'CORP-WS-01')}
-                      </pre>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 uppercase font-mono">Validation Command:</span>
-                      <pre className="mt-1 bg-slate-900 p-2 rounded text-emerald-400 font-mono text-[11px] overflow-x-auto border border-slate-800">
-                        {chk.verificationCommand}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Step 5: Master Action & Execution Bar */}
-      <div className="sticky bottom-4 z-30 bg-slate-900/95 backdrop-blur-md border border-cyan-500/40 rounded-2xl p-4 sm:p-5 shadow-2xl shadow-cyan-950/50">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-white font-bold text-sm sm:text-base">
-                Ready to Provision <span className="text-cyan-400 font-mono">{machineName || 'Workstation'}</span>
-              </span>
-              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-xs font-medium">
-                {selectedPackageIds.length} Apps + {selectedChecklistIds.length} Tasks
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5 flex items-center space-x-2">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Estimated Deployment Time: ~{totalEstimatedMinutes} minutes</span>
-              <span>•</span>
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Full Audit Trail</span>
-            </p>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={onOpenScriptModal}
-              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-medium text-xs sm:text-sm border border-slate-700 transition-all"
-            >
-              <Terminal className="w-4 h-4 text-cyan-400" />
-              <span>View .ps1 Script</span>
-            </button>
-
-            <button
-              onClick={onStartDeployment}
-              disabled={selectedPackageIds.length === 0 && selectedChecklistIds.length === 0}
-              className="flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-cyan-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              <Play className="w-4 h-4 fill-white" />
-              <span>RUN ZERO-TOUCH PROVISIONING</span>
-            </button>
-          </div>
+          <button
+            onClick={onStartDeployment}
+            disabled={selectedPackageIds.length === 0}
+            className="flex items-center space-x-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/30 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Play className="w-4 h-4 fill-white" />
+            <span>Run Zero-Touch Deployment</span>
+          </button>
         </div>
       </div>
     </div>

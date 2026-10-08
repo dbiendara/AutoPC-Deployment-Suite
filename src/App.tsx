@@ -1,72 +1,125 @@
 import React, { useState, useEffect } from 'react';
 import {
   SoftwarePackage,
-  ChecklistItem,
-  RoleProfile,
+  CustomerProfile,
+  SystemConfigSettings,
+  SystemConfigSwitch,
   DeploymentRecord,
 } from './types';
 import { Header } from './components/Header';
 import { NewPCWizard } from './components/NewPCWizard';
 import { LiveRunner } from './components/LiveRunner';
 import { AIDetective } from './components/AIDetective';
+import { CustomerProfilesManager } from './components/CustomerProfilesManager';
 import { PackageLibrary } from './components/PackageLibrary';
 import { DeploymentHistory } from './components/DeploymentHistory';
 import { ScriptModal } from './components/ScriptModal';
 import { AuditCertificateModal } from './components/AuditCertificateModal';
+import { SystemConfigManager } from './components/SystemConfigManager';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'wizard' | 'runner' | 'library' | 'ai-detective' | 'history'>('wizard');
+  const [activeTab, setActiveTab] = useState<'wizard' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers'>('wizard');
   const [packages, setPackages] = useState<SoftwarePackage[]>([]);
-  const [checklists, setChecklists] = useState<ChecklistItem[]>([]);
-  const [profiles, setProfiles] = useState<RoleProfile[]>([]);
+  const [customers, setCustomers] = useState<CustomerProfile[]>([]);
   const [deployments, setDeployments] = useState<DeploymentRecord[]>([]);
+  const [systemSwitches, setSystemSwitches] = useState<SystemConfigSwitch[]>([]);
 
-  // Machine state
-  const [machineName, setMachineName] = useState('CORP-ENG-W11-482');
-  const [employeeName, setEmployeeName] = useState('Sarah Jenkins');
-  const [employeeEmail, setEmployeeEmail] = useState('s.jenkins@enterprise.corp');
-  const [department, setDepartment] = useState('Engineering');
-  const [serialNumber, setSerialNumber] = useState('5CG2490X1P');
+  // Machine state (already in local Active Directory with hostname set)
+  const [machineName, setMachineName] = useState('ACME-WS-084');
 
-  // Selections
-  const [activeProfileId, setActiveProfileId] = useState('developer');
+  // Selected customer profile
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('cust-acme');
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
-  const [selectedChecklistIds, setSelectedChecklistIds] = useState<string[]>([]);
+  const [packageCustomSwitches, setPackageCustomSwitches] = useState<Record<string, string>>({});
+  const [packageConfigFiles, setPackageConfigFiles] = useState<Record<string, string>>({});
 
-  // Modals & Runners
+  // Dynamic system configuration switch states
+  const [enabledSwitchIds, setEnabledSwitchIds] = useState<string[]>(['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby']);
+  const [switchParameters, setSwitchParameters] = useState<Record<string, string | number>>({
+    adAdminGroupName: 'ACME\\IT-Workstation-Admins',
+    screenTimeoutAc: 15,
+    standbyTimeoutAc: 0,
+  });
+
+  // Legacy system configuration settings (kept in sync)
+  const [systemConfig, setSystemConfig] = useState<SystemConfigSettings>({
+    enableRdp: true,
+    addAdGroupToAdmins: true,
+    adAdminGroupName: 'ACME\\IT-Workstation-Admins',
+    setPowerPlan: true,
+    screenTimeoutAc: 15,
+    standbyTimeoutAc: 0,
+  });
+
+  // Runner & Modals
   const [isDeploying, setIsDeploying] = useState(false);
   const [isScriptModalOpen, setIsScriptModalOpen] = useState(false);
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const [isSystemConfigManagerOpen, setIsSystemConfigManagerOpen] = useState(false);
   const [activeAuditRecord, setActiveAuditRecord] = useState<DeploymentRecord | null>(null);
 
   // Initial data loading
   useEffect(() => {
     Promise.all([
       fetch('/api/packages').then((r) => r.json()),
-      fetch('/api/checklists').then((r) => r.json()),
       fetch('/api/profiles').then((r) => r.json()),
+      fetch('/api/system-switches').then((r) => r.json()),
       fetch('/api/deployments').then((r) => r.json()),
     ])
-      .then(([pkgs, chks, profs, deps]) => {
+      .then(([pkgs, custs, switches, deps]) => {
         setPackages(pkgs || []);
-        setChecklists(chks || []);
-        setProfiles(profs || []);
+        setCustomers(custs || []);
+        setSystemSwitches(switches || []);
         setDeployments(deps || []);
 
-        // Initial preset selection from 'developer'
-        const devProf = (profs || []).find((p: RoleProfile) => p.id === 'developer');
-        if (devProf) {
-          setSelectedPackageIds(devProf.packageIds);
-          setSelectedChecklistIds(devProf.checklistIds);
-        } else if (pkgs && pkgs.length > 0) {
-          setSelectedPackageIds(pkgs.slice(0, 5).map((p: SoftwarePackage) => p.id));
-          setSelectedChecklistIds((chks || []).slice(0, 4).map((c: ChecklistItem) => c.id));
+        if (Array.isArray(switches)) {
+          const defaultEnabled = switches.filter((s: SystemConfigSwitch) => s.enabledByDefault).map((s: SystemConfigSwitch) => s.id);
+          setEnabledSwitchIds(defaultEnabled.length > 0 ? defaultEnabled : ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby']);
+        }
+
+        // Initial default customer setup
+        const initialCust = (custs || [])[0];
+        if (initialCust) {
+          setSelectedCustomerId(initialCust.id);
+          setSelectedPackageIds(initialCust.packageIds || []);
+          if (initialCust.packageCustomSwitches) {
+            setPackageCustomSwitches(initialCust.packageCustomSwitches);
+          }
+          if (initialCust.packageConfigFiles) {
+            setPackageConfigFiles(initialCust.packageConfigFiles);
+          }
+          setSystemConfig({
+            enableRdp: initialCust.enableRdp,
+            addAdGroupToAdmins: true,
+            adAdminGroupName: initialCust.defaultAdAdminGroup,
+            setPowerPlan: true,
+            screenTimeoutAc: initialCust.powerPlanSettings?.screenTimeoutAc ?? 15,
+            standbyTimeoutAc: initialCust.powerPlanSettings?.standbyTimeoutAc ?? 0,
+          });
+          setSwitchParameters((prev) => ({
+            ...prev,
+            adAdminGroupName: initialCust.defaultAdAdminGroup,
+            screenTimeoutAc: initialCust.powerPlanSettings?.screenTimeoutAc ?? 15,
+            standbyTimeoutAc: initialCust.powerPlanSettings?.standbyTimeoutAc ?? 0,
+          }));
         }
       })
       .catch((err) => console.error('Error fetching initial setup data:', err));
   }, []);
 
-  // Handlers
+  const activeCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0] || {
+    id: 'default',
+    companyName: 'Corporate Client',
+    customerCode: 'CORP',
+    domainName: 'corp.local',
+    defaultAdAdminGroup: 'CORP\\IT-Admins',
+    uncShareRoot: '\\\\corp-fs01.internal.net\\deployments',
+    enableRdp: true,
+    powerPlanSettings: { screenTimeoutAc: 15, standbyTimeoutAc: 0 },
+    packageIds: [],
+  };
+
+  // Handlers for Deployment
   const handleStartDeployment = () => {
     setIsDeploying(true);
     setActiveTab('runner');
@@ -89,6 +142,7 @@ export default function App() {
       });
   };
 
+  // Handlers for Packages
   const handleAddPackage = (newPkg: SoftwarePackage) => {
     fetch('/api/packages', {
       method: 'POST',
@@ -98,8 +152,10 @@ export default function App() {
       .then((r) => r.json())
       .then((saved) => {
         setPackages((prev) => [saved, ...prev]);
-        // Also select it for the current machine
         setSelectedPackageIds((prev) => [...prev, saved.id]);
+        if (saved.extraSwitches) {
+          setPackageCustomSwitches((prev) => ({ ...prev, [saved.id]: saved.extraSwitches! }));
+        }
       })
       .catch(() => {
         setPackages((prev) => [newPkg, ...prev]);
@@ -113,13 +169,131 @@ export default function App() {
     setSelectedPackageIds((prev) => prev.filter((pId) => pId !== id));
   };
 
+  const handleUpdatePackage = (updated: SoftwarePackage) => {
+    fetch(`/api/packages/${updated.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    })
+      .then((r) => r.json())
+      .then((saved) => {
+        setPackages((prev) => prev.map((p) => (p.id === saved.id ? saved : p)));
+        if (saved.extraSwitches) {
+          setPackageCustomSwitches((prev) => ({ ...prev, [saved.id]: saved.extraSwitches! }));
+        }
+      })
+      .catch(() => {
+        setPackages((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      });
+  };
+
+  // Handlers for Customer Profiles
+  const handleAddCustomer = (newProfile: CustomerProfile) => {
+    fetch('/api/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newProfile),
+    })
+      .then((r) => r.json())
+      .then((saved) => {
+        setCustomers((prev) => [...prev, saved]);
+      })
+      .catch(() => {
+        setCustomers((prev) => [...prev, newProfile]);
+      });
+  };
+
+  const handleUpdateCustomer = (updated: CustomerProfile) => {
+    fetch(`/api/profiles/${updated.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    })
+      .then((r) => r.json())
+      .then((saved) => {
+        setCustomers((prev) => prev.map((c) => (c.id === saved.id ? saved : c)));
+      })
+      .catch(() => {
+        setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      });
+  };
+
+  const handleSelectCustomerForSetup = (customerId: string) => {
+    const cust = customers.find((c) => c.id === customerId);
+    if (cust) {
+      setSelectedCustomerId(cust.id);
+      setSelectedPackageIds(cust.packageIds || []);
+      if (cust.packageCustomSwitches) {
+        setPackageCustomSwitches(cust.packageCustomSwitches);
+      }
+      if (cust.packageConfigFiles) {
+        setPackageConfigFiles(cust.packageConfigFiles);
+      }
+      setSystemConfig((prev) => ({
+        ...prev,
+        enableRdp: cust.enableRdp,
+        adAdminGroupName: cust.defaultAdAdminGroup,
+        screenTimeoutAc: cust.powerPlanSettings?.screenTimeoutAc ?? 15,
+        standbyTimeoutAc: cust.powerPlanSettings?.standbyTimeoutAc ?? 0,
+      }));
+      setSwitchParameters((prev) => ({
+        ...prev,
+        adAdminGroupName: cust.defaultAdAdminGroup,
+        screenTimeoutAc: cust.powerPlanSettings?.screenTimeoutAc ?? 15,
+        standbyTimeoutAc: cust.powerPlanSettings?.standbyTimeoutAc ?? 0,
+      }));
+    }
+    setActiveTab('wizard');
+  };
+
+  // Handlers for System Configuration Switches
+  const handleAddSwitch = (newSwitch: SystemConfigSwitch) => {
+    fetch('/api/system-switches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newSwitch),
+    })
+      .then((r) => r.json())
+      .then((saved) => {
+        setSystemSwitches((prev) => [...prev, saved]);
+        setEnabledSwitchIds((prev) => [...prev, saved.id]);
+        if (saved.parameterKey && saved.parameterDefaultValue !== undefined) {
+          setSwitchParameters((prev) => ({ ...prev, [saved.parameterKey!]: saved.parameterDefaultValue! }));
+        }
+      })
+      .catch(() => {
+        setSystemSwitches((prev) => [...prev, newSwitch]);
+        setEnabledSwitchIds((prev) => [...prev, newSwitch.id]);
+      });
+  };
+
+  const handleUpdateSwitch = (updatedSwitch: SystemConfigSwitch) => {
+    fetch(`/api/system-switches/${updatedSwitch.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedSwitch),
+    })
+      .then((r) => r.json())
+      .then((saved) => {
+        setSystemSwitches((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+      })
+      .catch(() => {
+        setSystemSwitches((prev) => prev.map((s) => (s.id === updatedSwitch.id ? updatedSwitch : s)));
+      });
+  };
+
+  const handleDeleteSwitch = (id: string) => {
+    fetch(`/api/system-switches/${id}`, { method: 'DELETE' }).catch((err) => console.error(err));
+    setSystemSwitches((prev) => prev.filter((s) => s.id !== id));
+    setEnabledSwitchIds((prev) => prev.filter((sId) => sId !== id));
+  };
+
   const handleViewCertificate = (record: DeploymentRecord) => {
     setActiveAuditRecord(record);
     setIsAuditModalOpen(true);
   };
 
   const selectedPackages = packages.filter((p) => selectedPackageIds.includes(p.id));
-  const selectedChecklists = checklists.filter((c) => selectedChecklistIds.includes(c.id));
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-cyan-500 selection:text-white">
@@ -128,32 +302,36 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         machineName={machineName}
+        selectedCustomerName={activeCustomer.companyName}
         isDeploying={isDeploying}
       />
 
-      {/* Main Workspace Body */}
+      {/* Main Content Body */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'wizard' && (
           <NewPCWizard
             packages={packages}
-            checklists={checklists}
-            profiles={profiles}
+            customers={customers}
             machineName={machineName}
             setMachineName={setMachineName}
-            employeeName={employeeName}
-            setEmployeeName={setEmployeeName}
-            employeeEmail={employeeEmail}
-            setEmployeeEmail={setEmployeeEmail}
-            department={department}
-            setDepartment={setDepartment}
-            serialNumber={serialNumber}
-            setSerialNumber={setSerialNumber}
+            selectedCustomerId={selectedCustomerId}
+            setSelectedCustomerId={setSelectedCustomerId}
             selectedPackageIds={selectedPackageIds}
             setSelectedPackageIds={setSelectedPackageIds}
-            selectedChecklistIds={selectedChecklistIds}
-            setSelectedChecklistIds={setSelectedChecklistIds}
-            activeProfileId={activeProfileId}
-            setActiveProfileId={setActiveProfileId}
+            packageCustomSwitches={packageCustomSwitches}
+            setPackageCustomSwitches={setPackageCustomSwitches}
+            packageConfigFiles={packageConfigFiles}
+            setPackageConfigFiles={setPackageConfigFiles}
+            systemConfig={systemConfig}
+            setSystemConfig={setSystemConfig}
+            systemSwitches={systemSwitches}
+            enabledSwitchIds={enabledSwitchIds}
+            setEnabledSwitchIds={setEnabledSwitchIds}
+            switchParameters={switchParameters}
+            setSwitchParameters={setSwitchParameters}
+            onOpenSystemConfigManager={() => setIsSystemConfigManagerOpen(true)}
+            onDeleteSwitch={handleDeleteSwitch}
+            onOpenManualPackageModal={() => setActiveTab('library')}
             onStartDeployment={handleStartDeployment}
             onOpenScriptModal={() => setIsScriptModalOpen(true)}
           />
@@ -164,13 +342,26 @@ export default function App() {
             isDeploying={isDeploying}
             setIsDeploying={setIsDeploying}
             machineName={machineName}
-            employeeName={employeeName}
-            department={department}
-            serialNumber={serialNumber}
+            customer={activeCustomer}
             selectedPackages={selectedPackages}
-            selectedChecklists={selectedChecklists}
+            packageCustomSwitches={packageCustomSwitches}
+            packageConfigFiles={packageConfigFiles}
+            systemConfig={systemConfig}
+            systemSwitches={systemSwitches}
+            enabledSwitchIds={enabledSwitchIds}
+            switchParameters={switchParameters}
             onCompleteDeployment={handleCompleteDeployment}
             onOpenAuditModal={() => setIsAuditModalOpen(true)}
+          />
+        )}
+
+        {activeTab === 'customers' && (
+          <CustomerProfilesManager
+            customers={customers}
+            packages={packages}
+            onAddCustomer={handleAddCustomer}
+            onUpdateCustomer={handleUpdateCustomer}
+            onSelectCustomerForSetup={handleSelectCustomerForSetup}
           />
         )}
 
@@ -184,6 +375,8 @@ export default function App() {
         {activeTab === 'library' && (
           <PackageLibrary
             packages={packages}
+            onAddPackage={handleAddPackage}
+            onUpdatePackage={handleUpdatePackage}
             onDeletePackage={handleDeletePackage}
             onOpenAIDetective={() => setActiveTab('ai-detective')}
           />
@@ -193,21 +386,34 @@ export default function App() {
           <DeploymentHistory
             deployments={deployments}
             packages={packages}
-            checklists={checklists}
             onViewCertificate={handleViewCertificate}
           />
         )}
       </main>
+
+      {/* System Configuration Switches Manager Modal */}
+      <SystemConfigManager
+        isOpen={isSystemConfigManagerOpen}
+        onClose={() => setIsSystemConfigManagerOpen(false)}
+        switches={systemSwitches}
+        onAddSwitch={handleAddSwitch}
+        onUpdateSwitch={handleUpdateSwitch}
+        onDeleteSwitch={handleDeleteSwitch}
+      />
 
       {/* Script Generation Modal */}
       <ScriptModal
         isOpen={isScriptModalOpen}
         onClose={() => setIsScriptModalOpen(false)}
         machineName={machineName}
-        employeeName={employeeName}
-        department={department}
+        customerProfile={activeCustomer}
         selectedPackages={selectedPackages}
-        selectedChecklists={selectedChecklists}
+        packageCustomSwitches={packageCustomSwitches}
+        packageConfigFiles={packageConfigFiles}
+        systemConfig={systemConfig}
+        systemSwitches={systemSwitches}
+        enabledSwitchIds={enabledSwitchIds}
+        switchParameters={switchParameters}
       />
 
       {/* Workstation Handover Audit Certificate Modal */}
@@ -216,7 +422,6 @@ export default function App() {
         onClose={() => setIsAuditModalOpen(false)}
         record={activeAuditRecord || deployments[0] || null}
         packages={packages}
-        checklists={checklists}
       />
     </div>
   );
