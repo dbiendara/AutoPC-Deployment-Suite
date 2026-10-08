@@ -1,0 +1,6 @@
+{
+  "name": "AutoPC Deploy & Admin Suite",
+  "description": "Automate PC onboarding, silent software installations from UNC network shares, system configuration checklists, and AI-powered silent switch parameter detection.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
