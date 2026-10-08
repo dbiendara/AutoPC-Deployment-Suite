@@ -156,16 +156,20 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
 
     // Software packages
     selectedPackages.forEach((pkg) => {
+      const isWinget = pkg.sourceType === 'winget' || pkg.installerType === 'Winget' || Boolean(pkg.wingetId);
       const extra = packageCustomSwitches[pkg.id] || pkg.extraSwitches;
       const config = packageConfigFiles[pkg.id] || pkg.configFileImport?.configFileName;
-      let sub = `${pkg.uncPath}\\${pkg.fileName}`;
+      
+      let sub = isWinget
+        ? `winget install --id "${pkg.wingetId || pkg.fileName}" --silent`
+        : `${pkg.uncPath}\\${pkg.fileName}`;
       if (extra) sub += ` [Extra switches active]`;
       if (config) sub += ` [Config: ${config}]`;
 
       initialSteps.push({
         id: `step-pkg-${pkg.id}`,
         type: 'package',
-        title: `Silent Install: ${pkg.name}`,
+        title: isWinget ? `Winget Install: ${pkg.name}` : `Silent Install: ${pkg.name}`,
         subtext: sub,
         status: 'pending',
         logLines: [],
@@ -274,8 +278,13 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
       } else if (currentStep.type === 'package') {
         const pkg = selectedPackages.find((p) => `step-pkg-${p.id}` === currentStep.id);
         if (pkg) {
+          const isWinget = pkg.sourceType === 'winget' || pkg.installerType === 'Winget' || Boolean(pkg.wingetId);
           const extra = packageCustomSwitches[pkg.id] || pkg.extraSwitches || '';
-          successMsg = `[${finishTimeStr}] [SUCCESS] Silent install verified: ${pkg.name} ${extra ? `[Extra switches: ${extra}]` : ''}`;
+          if (isWinget) {
+            successMsg = `[${finishTimeStr}] [SUCCESS] Winget installation verified: ${pkg.name} (winget install --id "${pkg.wingetId || pkg.fileName}" -e)`;
+          } else {
+            successMsg = `[${finishTimeStr}] [SUCCESS] UNC silent install verified: ${pkg.name} ${extra ? `[Extra switches: ${extra}]` : ''}`;
+          }
         }
       }
 

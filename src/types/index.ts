@@ -3,9 +3,11 @@ export interface SoftwarePackage {
   name: string;
   version: string;
   category: 'RemoteSupport' | 'Browser' | 'Development' | 'Productivity' | 'Communication' | 'Security' | 'Utilities';
+  sourceType?: 'unc' | 'winget'; // Distribution channel: UNC network share or Windows Package Manager
+  wingetId?: string; // e.g. 7zip.7zip, VideoLAN.VLC, Microsoft.Outlook
   uncPath: string;
   fileName: string;
-  installerType: 'MSI' | 'InnoSetup' | 'NSIS' | 'InstallShield' | 'WiX' | 'CustomEXE' | 'PowerShellScript';
+  installerType: 'MSI' | 'InnoSetup' | 'NSIS' | 'InstallShield' | 'WiX' | 'CustomEXE' | 'PowerShellScript' | 'Winget';
   silentArgs: string;
   extraSwitches?: string; // e.g., CUSTOMCONFIGID=xxxx APITOKEN=xxxx ASSIGNMENTOPTIONS="--alias %COMPUTERNAME%"
   configFileImport?: {

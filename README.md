@@ -22,15 +22,23 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 - **Power Management (powercfg)**: Standardizes AC monitor sleep and standby/sleep timeouts via `powercfg.exe` to prevent workstations from sleeping during maintenance windows or user shifts.
 - **Dynamic Switch Manager**: Technicians can create, modify, or retire custom system configuration switches with dynamic input parameters and custom PowerShell script snippets.
 
-### 📦 UNC Software Catalog & Silent Installer Engine
-- **Network Share Deployment**: Deploys software packages silently from SMB/UNC paths (e.g., `\\fs01.acme.corp\software$\...`).
+### 📦 UNC Software Catalog & Winget Package Manager Integration
+- **Hybrid Distribution Strategy**: Deploy software packages silently either from local SMB/UNC network shares (e.g., `\\fs01.acme.corp\software$\...`) OR directly from official Microsoft Windows Package Manager (**Winget**) repositories.
+- **Default Winget Catalog Items**: Preloaded support for essential workstation software that doesn't need to live on the local UNC share:
+  - **7-Zip** (`7zip.7zip`)
+  - **VLC Media Player** (`VideoLAN.VLC`)
+  - **Microsoft Outlook Classic** (`Microsoft.Outlook`)
+  - **Google Chrome** (`Google.Chrome`)
+  - **Notepad++** (`Notepad++.Notepad++`)
+  - **Adobe Acrobat Reader DC** (`Adobe.Acrobat.Reader.64-bit`)
 - **Installer Presets & Silent Switches**: Built-in support and parameter presets for:
+  - **Winget**: `winget install --id "<ID>" --exact --silent --accept-package-agreements --accept-source-agreements --disable-interactivity`
   - **MSI / Windows Installer**: `/qn /norestart ALLUSERS=1` with custom public properties (`ASSIGNMENTOPTIONS`, `APITOKEN`, etc.).
   - **Inno Setup**: `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-`
   - **NSIS**: `/S`
   - **WiX Toolset**: `/quiet /norestart`
   - **TeamViewer Host**: Full support for config file imports (`.tvopt`), API tokens, and assignment options.
-- **Manual Package Creation (No AI Required)**: Quickly register internal or bespoke enterprise packages with custom detection rules (registry keys or file paths), silent arguments, and installation timeout safeguards.
+- **Manual Package Creation (No AI Required)**: Quickly register internal or bespoke enterprise packages (UNC or Winget) with custom detection rules (registry keys or file paths), silent arguments, and installation timeout safeguards.
 - **AI-Assisted Switch Discovery**: Optional switch and silent argument discovery for rare or legacy installers via the Gemini API.
 
 ### 📜 Automated PowerShell Script Synthesis

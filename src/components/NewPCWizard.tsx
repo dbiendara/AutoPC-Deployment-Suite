@@ -94,6 +94,7 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
 }) => {
   const [packageSearch, setPackageSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [sourceFilter, setSourceFilter] = useState<'All' | 'unc' | 'winget'>('All');
   const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
 
   // Selected customer profile
@@ -173,15 +174,22 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
   // Filtered packages
   const filteredPackages = useMemo(() => {
     return packages.filter((pkg) => {
+      const isWinget = pkg.sourceType === 'winget' || pkg.installerType === 'Winget' || Boolean(pkg.wingetId);
+      const matchesSource =
+        sourceFilter === 'All' ||
+        (sourceFilter === 'winget' && isWinget) ||
+        (sourceFilter === 'unc' && !isWinget);
+
       const matchesSearch =
         pkg.name.toLowerCase().includes(packageSearch.toLowerCase()) ||
         pkg.fileName.toLowerCase().includes(packageSearch.toLowerCase()) ||
+        (pkg.wingetId && pkg.wingetId.toLowerCase().includes(packageSearch.toLowerCase())) ||
         pkg.description.toLowerCase().includes(packageSearch.toLowerCase()) ||
         (pkg.extraSwitches && pkg.extraSwitches.toLowerCase().includes(packageSearch.toLowerCase()));
       const matchesCategory = categoryFilter === 'All' || pkg.category === categoryFilter;
-      return matchesSearch && matchesCategory;
+      return matchesSource && matchesSearch && matchesCategory;
     });
-  }, [packages, packageSearch, categoryFilter]);
+  }, [packages, packageSearch, categoryFilter, sourceFilter]);
 
   // Total estimated deployment time
   const totalEstimatedMinutes = useMemo(() => {
@@ -442,7 +450,7 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Silent deployment from UNC shares with custom configuration files and extra switches (e.g. TeamViewer Host tokens)
+                Silent deployment from UNC shares or directly via Windows Package Manager (Winget) for tools not on the UNC repo (7-Zip, VLC, Outlook Classic)
               </p>
             </div>
           </div>
@@ -454,7 +462,7 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 hover:text-white border border-cyan-800/60 text-xs font-semibold transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Add Package Manually</span>
+              <span>Add Package (UNC / Winget)</span>
             </button>
 
             <button
@@ -472,17 +480,58 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
           </div>
         </div>
 
-        {/* Search & Categories */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-5">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              placeholder="Search software, UNC file, or extra switches..."
-              value={packageSearch}
-              onChange={(e) => setPackageSearch(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
-            />
+        {/* Search, Source Filter & Categories */}
+        <div className="space-y-3 mb-5">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search software, Winget ID, UNC file, or extra switches..."
+                value={packageSearch}
+                onChange={(e) => setPackageSearch(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            {/* Distribution Source Filter */}
+            <div className="flex items-center space-x-1 bg-slate-950 p-1 rounded-lg border border-slate-800 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSourceFilter('All')}
+                className={`px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                  sourceFilter === 'All'
+                    ? 'bg-slate-800 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                All Sources
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceFilter('unc')}
+                className={`flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                  sourceFilter === 'unc'
+                    ? 'bg-emerald-900/80 border border-emerald-600 text-emerald-200'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <FolderOpen className="w-3 h-3 text-emerald-400" />
+                <span>UNC Shares</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSourceFilter('winget')}
+                className={`flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                  sourceFilter === 'winget'
+                    ? 'bg-sky-900/80 border border-sky-600 text-sky-200'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Terminal className="w-3 h-3 text-sky-400" />
+                <span>Winget Repo</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0">
@@ -490,7 +539,7 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
               <button
                 key={cat}
                 onClick={() => setCategoryFilter(cat)}
-                className={`text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                className={`text-xs px-3 py-1 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                   categoryFilter === cat
                     ? 'bg-cyan-600 text-white font-semibold'
                     : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white'
@@ -509,13 +558,16 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
             const extraSwitches = packageCustomSwitches[pkg.id] || pkg.extraSwitches;
             const configFile = packageConfigFiles[pkg.id] || pkg.configFileImport?.configFileName;
             const isEditing = editingPackageId === pkg.id;
+            const isWinget = pkg.sourceType === 'winget' || pkg.installerType === 'Winget' || Boolean(pkg.wingetId);
 
             return (
               <div
                 key={pkg.id}
                 className={`rounded-xl border transition-all ${
                   isSelected
-                    ? 'bg-slate-950/90 border-cyan-500/80 shadow-md ring-1 ring-cyan-500/20'
+                    ? isWinget
+                      ? 'bg-slate-950/90 border-sky-500/80 shadow-md ring-1 ring-sky-500/20'
+                      : 'bg-slate-950/90 border-cyan-500/80 shadow-md ring-1 ring-cyan-500/20'
                     : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'
                 }`}
               >
@@ -527,36 +579,60 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
                     >
                       <div className="mt-0.5">
                         {isSelected ? (
-                          <CheckCircle2 className="w-5 h-5 text-cyan-400" />
+                          <CheckCircle2 className={`w-5 h-5 ${isWinget ? 'text-sky-400' : 'text-cyan-400'}`} />
                         ) : (
                           <Circle className="w-5 h-5 text-slate-600" />
                         )}
                       </div>
                       <div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <h3 className="text-sm font-bold text-white">{pkg.name}</h3>
                           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
                             v{pkg.version}
                           </span>
+                          {isWinget ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-950 border border-sky-800 text-sky-300 font-mono">
+                              🪟 Winget
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-900 text-emerald-300 font-mono">
+                              🏢 UNC Share
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{pkg.description}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center space-x-1 shrink-0">
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-                        {pkg.installerType}
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                        isWinget
+                          ? 'bg-sky-950/80 border-sky-800 text-sky-300'
+                          : 'bg-slate-900 border-slate-800 text-slate-400'
+                      }`}>
+                        {isWinget ? 'Winget' : pkg.installerType}
                       </span>
                     </div>
                   </div>
 
-                  {/* UNC Path & Est Time */}
+                  {/* Distribution Path & Est Time */}
                   <div className="mt-2.5 pt-2 border-t border-slate-850 flex items-center justify-between text-[11px] text-slate-400">
                     <div className="flex items-center space-x-1.5 font-mono truncate max-w-[280px]">
-                      <FolderOpen className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                      <span className="truncate" title={`${pkg.uncPath}\\${pkg.fileName}`}>
-                        {pkg.uncPath}\{pkg.fileName}
-                      </span>
+                      {isWinget ? (
+                        <>
+                          <Terminal className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                          <span className="truncate text-sky-300" title={`winget install --id "${pkg.wingetId || pkg.fileName}"`}>
+                            winget: {pkg.wingetId || pkg.fileName}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <FolderOpen className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          <span className="truncate" title={`${pkg.uncPath}\\${pkg.fileName}`}>
+                            {pkg.uncPath}\{pkg.fileName}
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     <div className="flex items-center space-x-1 shrink-0 text-slate-400">

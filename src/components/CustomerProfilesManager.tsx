@@ -117,7 +117,18 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
 
   const handleSelectCorePackages = () => {
     const coreIds = packages
-      .filter((p) => ['pkg-teamviewer', 'pkg-chrome', 'pkg-7zip', 'pkg-acrobat', 'pkg-m365'].includes(p.id))
+      .filter((p) =>
+        [
+          'pkg-teamviewer',
+          'pkg-chrome',
+          'pkg-7zip',
+          'pkg-acrobat',
+          'pkg-m365',
+          'pkg-winget-7zip',
+          'pkg-winget-vlc',
+          'pkg-winget-outlook-classic',
+        ].includes(p.id)
+      )
       .map((p) => p.id);
     setSelectedPkgIds(coreIds);
   };
@@ -472,14 +483,25 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="text-xs font-bold text-white truncate">{pkg.name}</span>
+                        <div className="flex items-center space-x-1.5 truncate">
+                          <span className="text-xs font-bold text-white truncate">{pkg.name}</span>
+                          {(pkg.sourceType === 'winget' || pkg.installerType === 'Winget' || pkg.wingetId) ? (
+                            <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-800 shrink-0">
+                              Winget
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-900 shrink-0">
+                              UNC
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 shrink-0">
                           {pkg.installerType}
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-400 line-clamp-1 mb-1">{pkg.description}</p>
                       <div className="flex items-center space-x-2 text-[10px] font-mono text-slate-400 truncate">
-                        <span className="truncate">{pkg.fileName}</span>
+                        <span className="truncate">{pkg.wingetId || pkg.fileName}</span>
                         <span>•</span>
                         <span>{pkg.estimatedMinutes}m</span>
                         {pkg.id === 'pkg-teamviewer' && (
