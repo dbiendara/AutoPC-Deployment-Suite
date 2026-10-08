@@ -241,6 +241,17 @@ export default function App() {
       });
   };
 
+  const handleDeleteCustomer = (id: string) => {
+    fetch(`/api/profiles/${id}`, { method: 'DELETE' }).catch((err) => console.error(err));
+    setCustomers((prev) => {
+      const remaining = prev.filter((c) => c.id !== id);
+      if (selectedCustomerId === id && remaining.length > 0) {
+        handleSelectCustomerForSetup(remaining[0].id);
+      }
+      return remaining;
+    });
+  };
+
   const handleSelectCustomerForSetup = (customerId: string) => {
     const cust = customers.find((c) => c.id === customerId);
     if (cust) {
@@ -402,6 +413,7 @@ export default function App() {
             packages={packages}
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
+            onDeleteCustomer={handleDeleteCustomer}
             onSelectCustomerForSetup={handleSelectCustomerForSetup}
           />
         )}

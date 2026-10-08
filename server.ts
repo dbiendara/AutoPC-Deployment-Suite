@@ -872,6 +872,15 @@ app.put('/api/profiles/:id', (req, res) => {
   res.json(customerProfiles[index]);
 });
 
+app.delete('/api/profiles/:id', (req, res) => {
+  const exists = customerProfiles.some((p) => p.id === req.params.id);
+  if (!exists) {
+    return res.status(404).json({ error: 'Profile not found' });
+  }
+  customerProfiles = customerProfiles.filter((p) => p.id !== req.params.id);
+  res.json({ success: true, deletedId: req.params.id });
+});
+
 // System Configuration Switches API (Add, Edit, Remove dynamic switches)
 app.get('/api/system-switches', (req, res) => {
   res.json(systemConfigSwitches);
