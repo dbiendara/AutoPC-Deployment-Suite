@@ -4,6 +4,9 @@ import {
   CustomerProfile,
   SystemConfigSettings,
   SystemConfigSwitch,
+  NetworkDriveMapping,
+  PrinterMapping,
+  UserLogonStagingConfig,
 } from '../types';
 import {
   Monitor,
@@ -37,6 +40,8 @@ import {
   FilePlus,
   ShieldCheck,
   FolderOpen,
+  Printer,
+  Link2,
 } from 'lucide-react';
 
 interface NewPCWizardProps {
@@ -59,6 +64,12 @@ interface NewPCWizardProps {
   setEnabledSwitchIds: React.Dispatch<React.SetStateAction<string[]>>;
   switchParameters: Record<string, string | number>;
   setSwitchParameters: React.Dispatch<React.SetStateAction<Record<string, string | number>>>;
+  stagedDrives: NetworkDriveMapping[];
+  setStagedDrives: React.Dispatch<React.SetStateAction<NetworkDriveMapping[]>>;
+  stagedPrinters: PrinterMapping[];
+  setStagedPrinters: React.Dispatch<React.SetStateAction<PrinterMapping[]>>;
+  userLogonStaging: UserLogonStagingConfig;
+  setUserLogonStaging: React.Dispatch<React.SetStateAction<UserLogonStagingConfig>>;
   onOpenSystemConfigManager: () => void;
   onDeleteSwitch: (id: string) => void;
   onOpenManualPackageModal: () => void;
@@ -86,6 +97,12 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
   setEnabledSwitchIds,
   switchParameters,
   setSwitchParameters,
+  stagedDrives,
+  setStagedDrives,
+  stagedPrinters,
+  setStagedPrinters,
+  userLogonStaging,
+  setUserLogonStaging,
   onOpenSystemConfigManager,
   onDeleteSwitch,
   onOpenManualPackageModal,
@@ -125,6 +142,79 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
       screenTimeoutAc: customer.powerPlanSettings.screenTimeoutAc,
       standbyTimeoutAc: customer.powerPlanSettings.standbyTimeoutAc,
     }));
+    if (customer.networkDrives) {
+      setStagedDrives(customer.networkDrives);
+    }
+    if (customer.printers) {
+      setStagedPrinters(customer.printers);
+    }
+    if (customer.userLogonStaging) {
+      setUserLogonStaging(customer.userLogonStaging);
+    }
+  };
+
+  // State for adding one-off drives/printers in wizard
+  const [wDriveLetter, setWDriveLetter] = useState('P:');
+  const [wDriveUnc, setWDriveUnc] = useState('');
+  const [wDriveLabel, setWDriveLabel] = useState('');
+  const [wPrinterName, setWPrinterName] = useState('');
+  const [wPrinterPath, setWPrinterPath] = useState('');
+  const [wPrinterType, setWPrinterType] = useState<'PerMachineUNC' | 'UserLogonUNC' | 'DirectIP'>('PerMachineUNC');
+  const [wPrinterDefault, setWPrinterDefault] = useState(false);
+
+  const toggleDrive = (driveId: string) => {
+    setStagedDrives((prev) =>
+      prev.map((d) => (d.id === driveId ? { ...d, enabled: d.enabled === false ? true : false } : d))
+    );
+  };
+
+  const removeDrive = (driveId: string) => {
+    setStagedDrives((prev) => prev.filter((d) => d.id !== driveId));
+  };
+
+  const addDrive = () => {
+    if (!wDriveUnc) return;
+    const newDrive: NetworkDriveMapping = {
+      id: `drv-${Date.now()}`,
+      driveLetter: wDriveLetter.endsWith(':') ? wDriveLetter : `${wDriveLetter}:`,
+      uncPath: wDriveUnc.trim(),
+      label: wDriveLabel.trim() || `${wDriveLetter} Share`,
+      persistent: true,
+      enabled: true,
+    };
+    setStagedDrives((prev) => [...prev, newDrive]);
+    setWDriveUnc('');
+    setWDriveLabel('');
+  };
+
+  const togglePrinter = (printerId: string) => {
+    setStagedPrinters((prev) =>
+      prev.map((p) => (p.id === printerId ? { ...p, enabled: p.enabled === false ? true : false } : p))
+    );
+  };
+
+  const removePrinter = (printerId: string) => {
+    setStagedPrinters((prev) => prev.filter((p) => p.id !== printerId));
+  };
+
+  const addPrinter = () => {
+    if (!wPrinterPath) return;
+    const newPrn: PrinterMapping = {
+      id: `prn-${Date.now()}`,
+      name: wPrinterName.trim() || wPrinterPath.split('\\').pop() || 'Network Printer',
+      connectionType: wPrinterType,
+      pathOrIp: wPrinterPath.trim(),
+      isDefault: wPrinterDefault,
+      enabled: true,
+    };
+    if (wPrinterDefault) {
+      setStagedPrinters((prev) => [...prev.map((p) => ({ ...p, isDefault: false })), newPrn]);
+    } else {
+      setStagedPrinters((prev) => [...prev, newPrn]);
+    }
+    setWPrinterName('');
+    setWPrinterPath('');
+    setWPrinterDefault(false);
   };
 
   // Toggle package
@@ -723,6 +813,284 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
         </div>
       </div>
 
+      {/* Step 4: User First-Logon Staging (Network Drives & Printers via Active Setup) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800 mb-5">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-lg bg-amber-950/80 text-amber-400 border border-amber-800/60 flex items-center justify-center font-bold text-sm">
+              4
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-base font-semibold text-white">
+                  User First-Logon Staging (Network Drives & Printers)
+                </h2>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-950 border border-amber-800/70 text-amber-300 font-medium">
+                  {stagedDrives.filter((d) => d.enabled !== false).length} Drives • {stagedPrinters.filter((p) => p.enabled !== false).length} Printers
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Staged for silent execution when the employee signs in via Windows Active Setup (HKLM) & Per-Machine PrintUI
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <label className="flex items-center space-x-2 cursor-pointer text-xs font-semibold text-slate-300 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800 hover:border-slate-700 transition-colors">
+              <input
+                type="checkbox"
+                checked={userLogonStaging.enabled !== false}
+                onChange={(e) => setUserLogonStaging((prev) => ({ ...prev, enabled: e.target.checked }))}
+                className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+              />
+              <span>Active Setup Staging Enabled</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Informative Explanation Banner solving user concern */}
+        <div className="bg-amber-950/30 border border-amber-800/40 rounded-xl p-4 mb-6 flex items-start space-x-3 text-xs">
+          <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="font-bold text-amber-200">
+              Why this is staged for First Logon:
+            </h4>
+            <p className="text-amber-300/80 leading-relaxed">
+              When deploying a new PC as administrator, the end-user is not yet logged in.
+              Network drive mappings (<code className="bg-amber-900/40 px-1 rounded font-mono">HKCU:\Network</code>) and per-user network printers require the employee's interactive Kerberos session.
+              AutoPC generates <code className="bg-amber-900/40 px-1 rounded font-mono">C:\ProgramData\AutoPC\UserLogonSetup.ps1</code> and registers it in Windows <strong>Active Setup</strong> (<code className="bg-amber-900/40 px-1 rounded font-mono">HKLM:\SOFTWARE\Microsoft\Active Setup\...</code>) and machine print connections (<code className="bg-amber-900/40 px-1 rounded font-mono">printui.dll /ga</code>).
+              When the employee signs into Windows for the first time, all drives and printers configure silently and automatically!
+            </p>
+          </div>
+        </div>
+
+        {/* Sub-grid: Network Drives (Left) & Network Printers (Right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left: Network Drives */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs font-bold text-white">
+                <Link2 className="w-4 h-4 text-amber-400" />
+                <span>Mapped Network Drives</span>
+              </div>
+              <span className="text-[11px] text-slate-400 font-mono">
+                {stagedDrives.filter((d) => d.enabled !== false).length} active of {stagedDrives.length}
+              </span>
+            </div>
+
+            {/* Drives List */}
+            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+              {stagedDrives.map((drv) => {
+                const isEnabled = drv.enabled !== false;
+                return (
+                  <div
+                    key={drv.id}
+                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 text-xs ${
+                      isEnabled
+                        ? 'bg-slate-900 border-amber-800/60 shadow-sm'
+                        : 'bg-slate-950/40 border-slate-850 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        onChange={() => toggleDrive(drv.id)}
+                        className="rounded border-slate-700 text-amber-500 focus:ring-amber-500 w-4 h-4 cursor-pointer shrink-0"
+                      />
+                      <span className="w-7 h-7 rounded-lg bg-amber-950 border border-amber-800 text-amber-300 font-mono font-bold flex items-center justify-center text-xs shrink-0">
+                        {drv.driveLetter}
+                      </span>
+                      <div className="min-w-0">
+                        <span className="text-white font-medium block truncate text-xs">{drv.label}</span>
+                        <span className="text-[11px] text-cyan-400 font-mono truncate block">{drv.uncPath}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removeDrive(drv.id)}
+                      className="text-slate-500 hover:text-red-400 p-1 transition-colors shrink-0"
+                      title="Remove drive"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+              {stagedDrives.length === 0 && (
+                <div className="text-xs text-slate-500 italic p-4 text-center border border-dashed border-slate-800 rounded-xl">
+                  No network drives assigned. Add one below.
+                </div>
+              )}
+            </div>
+
+            {/* Quick Add Drive in Wizard */}
+            <div className="pt-3 border-t border-slate-800/80 space-y-2">
+              <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold block">
+                + Add Custom Drive for this Workstation:
+              </span>
+              <div className="grid grid-cols-4 gap-2 text-xs">
+                <div className="col-span-1">
+                  <select
+                    value={wDriveLetter}
+                    onChange={(e) => setWDriveLetter(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-500"
+                  >
+                    {['S:', 'P:', 'M:', 'H:', 'Z:', 'N:', 'F:', 'L:', 'K:', 'O:', 'T:', 'X:'].map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-3">
+                  <input
+                    type="text"
+                    value={wDriveLabel}
+                    onChange={(e) => setWDriveLabel(e.target.value)}
+                    placeholder="Drive Label (e.g. Finance Archive)"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 text-xs">
+                <input
+                  type="text"
+                  value={wDriveUnc}
+                  onChange={(e) => setWDriveUnc(e.target.value)}
+                  placeholder="UNC Path: \\server\share or \\server\users\%USERNAME%"
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="button"
+                  onClick={addDrive}
+                  disabled={!wDriveUnc}
+                  className="px-3.5 py-1.5 rounded-lg bg-amber-950 hover:bg-amber-900 border border-amber-800 text-amber-200 text-xs font-semibold disabled:opacity-50 transition-colors"
+                >
+                  Add Drive
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Network Printers */}
+          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-xs font-bold text-white">
+                <Printer className="w-4 h-4 text-cyan-400" />
+                <span>Network Printers & Copiers</span>
+              </div>
+              <span className="text-[11px] text-slate-400 font-mono">
+                {stagedPrinters.filter((p) => p.enabled !== false).length} active of {stagedPrinters.length}
+              </span>
+            </div>
+
+            {/* Printers List */}
+            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+              {stagedPrinters.map((prn) => {
+                const isEnabled = prn.enabled !== false;
+                return (
+                  <div
+                    key={prn.id}
+                    className={`p-3 rounded-xl border transition-all flex items-center justify-between gap-3 text-xs ${
+                      isEnabled
+                        ? 'bg-slate-900 border-cyan-800/60 shadow-sm'
+                        : 'bg-slate-950/40 border-slate-850 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isEnabled}
+                        onChange={() => togglePrinter(prn.id)}
+                        className="rounded border-slate-700 text-cyan-500 focus:ring-cyan-500 w-4 h-4 cursor-pointer shrink-0"
+                      />
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-white font-medium truncate text-xs">{prn.name}</span>
+                          {prn.isDefault && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-800 text-emerald-300 font-bold">
+                              DEFAULT
+                            </span>
+                          )}
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${prn.connectionType === 'PerMachineUNC' ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-purple-950 text-purple-300 border border-purple-800'}`}>
+                            {prn.connectionType === 'PerMachineUNC' ? 'Per-Machine' : 'User-Logon'}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-400 font-mono truncate block">{prn.pathOrIp}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => removePrinter(prn.id)}
+                      className="text-slate-500 hover:text-red-400 p-1 transition-colors shrink-0"
+                      title="Remove printer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+              {stagedPrinters.length === 0 && (
+                <div className="text-xs text-slate-500 italic p-4 text-center border border-dashed border-slate-800 rounded-xl">
+                  No printers assigned. Add one below.
+                </div>
+              )}
+            </div>
+
+            {/* Quick Add Printer in Wizard */}
+            <div className="pt-3 border-t border-slate-800/80 space-y-2">
+              <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold block">
+                + Add Custom Printer for this Workstation:
+              </span>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <input
+                  type="text"
+                  value={wPrinterName}
+                  onChange={(e) => setWPrinterName(e.target.value)}
+                  placeholder="Printer Name (e.g. Floor 2 MFP)"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+                <select
+                  value={wPrinterType}
+                  onChange={(e) => setWPrinterType(e.target.value as any)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-cyan-300 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="PerMachineUNC">Per-Machine Connection (PrintUI /ga)</option>
+                  <option value="UserLogonUNC">Per-User Network Connection (Active Setup)</option>
+                </select>
+              </div>
+              <div className="flex gap-2 text-xs items-center">
+                <input
+                  type="text"
+                  value={wPrinterPath}
+                  onChange={(e) => setWPrinterPath(e.target.value)}
+                  placeholder="Path: \\printserver\printer_name"
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-cyan-300 font-mono placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+                <label className="flex items-center space-x-1 cursor-pointer text-[11px] text-slate-300 shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={wPrinterDefault}
+                    onChange={(e) => setWPrinterDefault(e.target.checked)}
+                    className="rounded border-slate-700 text-cyan-600 focus:ring-cyan-500 w-3.5 h-3.5"
+                  />
+                  <span>Default</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={addPrinter}
+                  disabled={!wPrinterPath}
+                  className="px-3.5 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-800 text-cyan-200 text-xs font-semibold disabled:opacity-50 transition-colors"
+                >
+                  Add Printer
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Execution Launcher Bar */}
       <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -734,7 +1102,8 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
             Target Host: <strong className="text-white font-mono">{machineName}</strong> • Profile:{' '}
             <strong className="text-cyan-400">{currentCustomer?.companyName}</strong> •{' '}
             <strong className="text-emerald-400">{selectedPackageIds.length} Packages</strong> •{' '}
-            <strong className="text-purple-400">{enabledSwitchIds.length} Switches</strong> • ~{totalEstimatedMinutes} min estimated
+            <strong className="text-purple-400">{enabledSwitchIds.length} Switches</strong> •{' '}
+            <strong className="text-amber-300 font-mono">{stagedDrives.filter((d) => d.enabled !== false).length} Drives, {stagedPrinters.filter((p) => p.enabled !== false).length} Printers Staged</strong> • ~{totalEstimatedMinutes} min
           </p>
         </div>
 

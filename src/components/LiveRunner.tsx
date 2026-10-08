@@ -5,6 +5,9 @@ import {
   SystemConfigSettings,
   SystemConfigSwitch,
   DeploymentRecord,
+  NetworkDriveMapping,
+  PrinterMapping,
+  UserLogonStagingConfig,
 } from '../types';
 import {
   Terminal,
@@ -28,6 +31,7 @@ import {
   Sliders,
   FolderOpen,
   Circle,
+  Printer,
 } from 'lucide-react';
 
 interface LiveRunnerProps {
@@ -42,13 +46,16 @@ interface LiveRunnerProps {
   systemSwitches?: SystemConfigSwitch[];
   enabledSwitchIds?: string[];
   switchParameters?: Record<string, string | number>;
+  stagedDrives?: NetworkDriveMapping[];
+  stagedPrinters?: PrinterMapping[];
+  userLogonStaging?: UserLogonStagingConfig;
   onCompleteDeployment: (record: DeploymentRecord) => void;
   onOpenAuditModal: () => void;
 }
 
 interface StepItem {
   id: string;
-  type: 'preflight' | 'system' | 'package' | 'postflight';
+  type: 'preflight' | 'system' | 'package' | 'logon-staging' | 'postflight';
   title: string;
   subtext: string;
   status: 'pending' | 'running' | 'success' | 'warn' | 'error';
@@ -67,6 +74,9 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
   systemSwitches = [],
   enabledSwitchIds = [],
   switchParameters = {},
+  stagedDrives = [],
+  stagedPrinters = [],
+  userLogonStaging = { enabled: true },
   onCompleteDeployment,
   onOpenAuditModal,
 }) => {
@@ -176,6 +186,19 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
       });
     });
 
+    // Staged User First-Logon Setup (Network Drives & Printers via Active Setup)
+    if (userLogonStaging?.enabled !== false && (stagedDrives.length > 0 || stagedPrinters.length > 0)) {
+      const driveList = stagedDrives.map((d) => d.driveLetter).join(', ');
+      initialSteps.push({
+        id: 'step-user-first-logon-staging',
+        type: 'logon-staging',
+        title: 'Stage User First-Logon Setup (Active Setup & Machine Printers)',
+        subtext: `Staging ${stagedDrives.length} drives (${driveList || 'none'}) and ${stagedPrinters.length} printers for new user first logon`,
+        status: 'pending',
+        logLines: [],
+      });
+    }
+
     // Post-flight
     initialSteps.push({
       id: 'step-postflight-audit',
@@ -196,6 +219,9 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
     systemSwitches,
     enabledSwitchIds,
     switchParameters,
+    stagedDrives,
+    stagedPrinters,
+    userLogonStaging,
   ]);
 
   // Elapsed timer
@@ -230,6 +256,9 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
         appliedSwitchIds: enabledSwitchIds,
         switchParameters,
         systemConfig,
+        stagedDrives,
+        stagedPrinters,
+        userLogonStaging,
         technicianName: 'Admin (AutoPC Suite)',
         logs,
         results: {
@@ -286,6 +315,10 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
             successMsg = `[${finishTimeStr}] [SUCCESS] UNC silent install verified: ${pkg.name} ${extra ? `[Extra switches: ${extra}]` : ''}`;
           }
         }
+      } else if (currentStep.type === 'logon-staging') {
+        const dCount = stagedDrives.length;
+        const pCount = stagedPrinters.length;
+        successMsg = `[${finishTimeStr}] [SUCCESS] Active Setup registered (HKLM) & payload staged (C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1). ${dCount} network drive(s) and ${pCount} printer(s) will map seamlessly upon initial user logon!`;
       }
 
       setLogs((prev) => [...prev, { timestamp: finishTimeStr, level: 'success', message: successMsg }]);

@@ -49,6 +49,12 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
   - Maintain an execution transcript log in `C:\ProgramData\AutoPC-Deploy\Logs\`.
   - Report exact return exit codes with graceful rollback warnings.
 
+### 🖧 User First-Logon Staging (Network Drives & Printers via Active Setup)
+- **Solves Non-Logged-In User Limitation**: Workstation provisioning runs as Administrator or SYSTEM before the employee ever logs in. Network drive mappings (`HKCU:\Network`) and per-user network printers require the user's interactive Kerberos security token.
+- **Enterprise Dual-Engine Solution**:
+  1. **Per-Machine Network Printers**: Configured machine-wide during provisioning using `rundll32 printui.dll,PrintUIEntry /ga /n"\\printserver\printer"`, making them immediately available to every present and future user on the PC.
+  2. **Active Setup First-Logon Staging**: AutoPC generates a self-contained payload at `C:\ProgramData\AutoPC\UserLogonSetup.ps1` and registers it in `HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\AutoPC_UserProvisioning` (with a secondary Scheduled Task trigger at logon). When any user signs in for the first time, the Windows Shell silently executes the script in their user context, mapping persistent drives (`net use S: "\\server\share" /persistent:yes` with dynamic `%USERNAME%` resolution) and assigning printers!
+
 ### ⏱️ Interactive Live Runner & Audit Certificates
 - **Step-by-Step Execution Console**: Real-time simulated or live execution terminal with timer tracking, status chips, and step-level rerun capabilities.
 - **Compliance Audit Certificates**: Generates downloadable, cryptographically identifiable completion certificates documenting machine hostname, domain, customer profile, applied system switches, and installed package inventory.

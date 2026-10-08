@@ -56,6 +56,34 @@ export interface SoftwarePackage {
   notes?: string;
 }
 
+export interface NetworkDriveMapping {
+  id: string;
+  driveLetter: string; // e.g., "S:", "P:", "H:"
+  uncPath: string; // e.g., "\\corp-fs01\Shares\Logistics", "\\corp-fs01\Users\%USERNAME%"
+  label: string;
+  persistent?: boolean;
+  enabled?: boolean;
+}
+
+export interface PrinterMapping {
+  id: string;
+  name: string;
+  connectionType: 'PerMachineUNC' | 'UserLogonUNC' | 'DirectIP';
+  pathOrIp: string;
+  driverName?: string;
+  isDefault?: boolean;
+  comment?: string;
+  enabled?: boolean;
+}
+
+export interface UserLogonStagingConfig {
+  enabled: boolean;
+  stagingPath?: string;
+  activeSetupKey?: string;
+  scheduledTaskFallback?: boolean;
+  cleanUpAfterFirstRun?: boolean;
+}
+
 export interface CustomerProfile {
   id: string;
   companyName: string;
@@ -71,6 +99,9 @@ export interface CustomerProfile {
   packageIds: string[];
   packageCustomSwitches?: Record<string, string>;
   packageConfigFiles?: Record<string, string>;
+  networkDrives?: NetworkDriveMapping[];
+  printers?: PrinterMapping[];
+  userLogonStaging?: UserLogonStagingConfig;
   notes?: string;
 }
 
@@ -113,6 +144,9 @@ export interface DeploymentRecord {
   appliedSwitchIds?: string[];
   switchParameters?: Record<string, string | number>;
   systemConfig?: SystemConfigSettings;
+  stagedDrives?: NetworkDriveMapping[];
+  stagedPrinters?: PrinterMapping[];
+  userLogonStaging?: UserLogonStagingConfig;
   logs: Array<{ timestamp: string; level: 'info' | 'warn' | 'error' | 'success'; message: string }>;
   results: {
     packages: Record<string, { status: 'success' | 'failed' | 'skipped'; exitCode?: number; log?: string }>;
@@ -532,6 +566,59 @@ let customerProfiles: CustomerProfile[] = [
     packageConfigFiles: {
       'pkg-teamviewer': '\\\\corp-fs01.internal.net\\deployments\\customers\\acme\\TeamViewer_Settings.tvopt',
     },
+    networkDrives: [
+      {
+        id: 'drv-acme-s',
+        driveLetter: 'S:',
+        uncPath: '\\\\corp-fs01.internal.net\\Shares\\Logistics',
+        label: 'Logistics Department Share',
+        persistent: true,
+        enabled: true,
+      },
+      {
+        id: 'drv-acme-p',
+        driveLetter: 'P:',
+        uncPath: '\\\\corp-fs01.internal.net\\Projects',
+        label: 'Engineering & Projects CAD',
+        persistent: true,
+        enabled: true,
+      },
+      {
+        id: 'drv-acme-h',
+        driveLetter: 'H:',
+        uncPath: '\\\\corp-fs01.internal.net\\Users\\%USERNAME%',
+        label: 'Personal User Home Folder (%USERNAME%)',
+        persistent: true,
+        enabled: true,
+      },
+    ],
+    printers: [
+      {
+        id: 'prn-acme-mfp',
+        name: 'ACME Floor 1 Canon ImageRUNNER Color MFP',
+        connectionType: 'PerMachineUNC',
+        pathOrIp: '\\\\corp-print01.internal.net\\ACME-Color-MFP',
+        isDefault: true,
+        comment: 'High-speed departmental network copier & printer',
+        enabled: true,
+      },
+      {
+        id: 'prn-acme-wh',
+        name: 'ACME Warehouse Zebra Shipping Label Printer',
+        connectionType: 'UserLogonUNC',
+        pathOrIp: '\\\\corp-print01.internal.net\\ACME-Warehouse-Labels',
+        isDefault: false,
+        comment: 'Zebra ZD420 direct thermal barcode printer',
+        enabled: true,
+      },
+    ],
+    userLogonStaging: {
+      enabled: true,
+      stagingPath: 'C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1',
+      activeSetupKey: 'AutoPC_UserProvisioning',
+      scheduledTaskFallback: true,
+      cleanUpAfterFirstRun: false,
+    },
     notes: 'Primary logistics client. Requires TeamViewer Host with unattended access token and IT-Workstation-Admins AD group.',
   },
   {
@@ -553,6 +640,42 @@ let customerProfiles: CustomerProfile[] = [
     packageConfigFiles: {
       'pkg-teamviewer': '\\\\corp-fs01.internal.net\\deployments\\customers\\contoso\\TeamViewer_Contoso.tvopt',
     },
+    networkDrives: [
+      {
+        id: 'drv-con-m',
+        driveLetter: 'M:',
+        uncPath: '\\\\contoso-fs01.local\\Operations',
+        label: 'Fleet & Dispatch Operations',
+        persistent: true,
+        enabled: true,
+      },
+      {
+        id: 'drv-con-s',
+        driveLetter: 'S:',
+        uncPath: '\\\\contoso-fs01.local\\PublicShared',
+        label: 'Company Public Share',
+        persistent: true,
+        enabled: true,
+      },
+    ],
+    printers: [
+      {
+        id: 'prn-con-hp',
+        name: 'Contoso Dispatch HP LaserJet Enterprise Flow MFP',
+        connectionType: 'PerMachineUNC',
+        pathOrIp: '\\\\contoso-print.local\\Contoso-HP-Color',
+        isDefault: true,
+        comment: 'Main office LaserJet color multi-function printer',
+        enabled: true,
+      },
+    ],
+    userLogonStaging: {
+      enabled: true,
+      stagingPath: 'C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1',
+      activeSetupKey: 'AutoPC_UserProvisioning',
+      scheduledTaskFallback: true,
+      cleanUpAfterFirstRun: false,
+    },
     notes: 'Contoso active directory environment. RDP enabled with NLA and screen timeout 20 min.',
   },
   {
@@ -571,6 +694,34 @@ let customerProfiles: CustomerProfile[] = [
     packageCustomSwitches: {
       'pkg-teamviewer': 'CUSTOMCONFIGID=idc55091 APITOKEN=339102-nexusmed ASSIGNMENTOPTIONS="--alias %COMPUTERNAME% --grant-easy-access"',
     },
+    networkDrives: [
+      {
+        id: 'drv-nex-n',
+        driveLetter: 'N:',
+        uncPath: '\\\\nexus-nas01.health\\ClinicalRecords',
+        label: 'Encrypted Clinical EMR Archive',
+        persistent: true,
+        enabled: true,
+      },
+    ],
+    printers: [
+      {
+        id: 'prn-nex-rx',
+        name: 'Nexus Clinic Secure FollowMe Badge Print',
+        connectionType: 'PerMachineUNC',
+        pathOrIp: '\\\\nexus-print01.health\\Clinic-Secure-FollowMe',
+        isDefault: true,
+        comment: 'HIPAA compliant badge-release follow-me printer queue',
+        enabled: true,
+      },
+    ],
+    userLogonStaging: {
+      enabled: true,
+      stagingPath: 'C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1',
+      activeSetupKey: 'AutoPC_UserProvisioning',
+      scheduledTaskFallback: true,
+      cleanUpAfterFirstRun: false,
+    },
     notes: 'Medical workstation compliance: 10 min screen timeout, RDP enabled, local admin delegated to Clinical-IT-Admins.',
   },
   {
@@ -588,6 +739,34 @@ let customerProfiles: CustomerProfile[] = [
     packageIds: ['pkg-teamviewer', 'pkg-chrome', 'pkg-7zip', 'pkg-acrobat', 'pkg-m365', 'pkg-crowdstrike'],
     packageCustomSwitches: {
       'pkg-teamviewer': 'CUSTOMCONFIGID=idc99420 APITOKEN=992810-apexfin ASSIGNMENTOPTIONS="--alias %COMPUTERNAME% --grant-easy-access"',
+    },
+    networkDrives: [
+      {
+        id: 'drv-apx-f',
+        driveLetter: 'F:',
+        uncPath: '\\\\apexfin.internal\\FinancialAnalytics',
+        label: 'Financial Audit & Risk Modeling Data',
+        persistent: true,
+        enabled: true,
+      },
+    ],
+    printers: [
+      {
+        id: 'prn-apx-lex',
+        name: 'Apex Floor 4 Lexmark Executive Secure MFP',
+        connectionType: 'PerMachineUNC',
+        pathOrIp: '\\\\apex-print.internal\\Apex-Secure-Color',
+        isDefault: true,
+        comment: 'Executive wing secure encrypted print server',
+        enabled: true,
+      },
+    ],
+    userLogonStaging: {
+      enabled: true,
+      stagingPath: 'C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1',
+      activeSetupKey: 'AutoPC_UserProvisioning',
+      scheduledTaskFallback: true,
+      cleanUpAfterFirstRun: false,
     },
     notes: 'Banking compliance client. Standby strictly disabled to prevent remote backup interruption.',
   },
@@ -1070,7 +1249,20 @@ app.post('/api/scripts/generate', (req, res) => {
     systemConfig,
     selectedSwitchIds,
     switchParameters,
+    networkDrives: customDrives,
+    printers: customPrinters,
+    userLogonStaging: customStaging,
   } = req.body;
+
+  const activeDrives: NetworkDriveMapping[] = Array.isArray(customDrives)
+    ? customDrives.filter((d: NetworkDriveMapping) => d.enabled !== false)
+    : (customerProfile?.networkDrives || []).filter((d: NetworkDriveMapping) => d.enabled !== false);
+
+  const activePrinters: PrinterMapping[] = Array.isArray(customPrinters)
+    ? customPrinters.filter((p: PrinterMapping) => p.enabled !== false)
+    : (customerProfile?.printers || []).filter((p: PrinterMapping) => p.enabled !== false);
+
+  const stagingConfig: UserLogonStagingConfig = customStaging || customerProfile?.userLogonStaging || { enabled: true };
 
   const targetPackages = softwarePackages.filter((p) => (selectedPackageIds || []).includes(p.id));
 
@@ -1324,6 +1516,179 @@ try {
 `;
   })
   .join('\n')}
+
+${
+  stagingConfig.enabled !== false && (activeDrives.length > 0 || activePrinters.length > 0)
+    ? `
+# ------------------------------------------------------------------------------
+# PHASE 4: USER FIRST-LOGON STAGING (NETWORK DRIVES & PRINTER MAPPINGS)
+# ------------------------------------------------------------------------------
+# ARCHITECTURE NOTE:
+# Workstation deployment runs in administrative/SYSTEM context where the end-user
+# has not logged on yet. Network drive mappings (HKCU:\\Network) and per-user
+# printers depend on user-profile registry hives and domain Kerberos tickets.
+# AutoPC solves this by:
+# 1. Installing Per-Machine Network Printers via PrintUI (rundll32 printui.dll,PrintUIEntry /ga)
+# 2. Staging C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1
+# 3. Registering Windows Active Setup in HKLM:\\SOFTWARE\\Microsoft\\Active Setup\\Installed Components\\AutoPC_UserProvisioning
+#    When ANY new user signs into Windows for the first time, Windows Shell runs this
+#    staged script in their user context, automatically mapping drives and printers!
+# ------------------------------------------------------------------------------
+Write-DeployLog "Phase 4: Staging User First-Logon Configuration (Active Setup & Machine Printers)..."
+
+# Ensure AutoPC staging directory exists
+$StagingDir = "C:\\ProgramData\\AutoPC"
+if (-not (Test-Path $StagingDir)) {
+    New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
+    Write-DeployLog "Created staging directory at $StagingDir"
+}
+
+${
+  // Per-Machine Printers (handled in provisioning phase)
+  activePrinters
+    .filter((p) => p.connectionType === 'PerMachineUNC')
+    .map(
+      (p) => `
+# Per-Machine Printer Connection: ${p.name}
+try {
+    Write-DeployLog "Installing Per-Machine Printer connection: ${p.pathOrIp} via PrintUI (/ga)..."
+    rundll32.exe printui.dll,PrintUIEntry /ga /n"${p.pathOrIp}"
+    Write-DeployLog "Per-machine printer registered: ${p.pathOrIp} (visible to all users on this PC)" "SUCCESS"
+} catch {
+    Write-DeployLog "Warning configuring per-machine printer ${p.pathOrIp}: $($_.Exception.Message)" "WARN"
+}
+`
+    )
+    .join('\n')
+}
+
+# ------------------------------------------------------------------------------
+# Generate User First-Logon Script: C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1
+# ------------------------------------------------------------------------------
+Write-DeployLog "Generating user logon configuration payload: $StagingDir\\UserLogonSetup.ps1..."
+
+$UserLogonScript = @'
+# ==============================================================================
+# AutoPC Staged User First-Logon Configuration Script
+# Target Customer: ${customerProfile?.companyName || 'Corporate Client'}
+# Generated by AutoPC Provisioning Suite
+# Triggered via Windows Active Setup & Scheduled Task upon initial user logon
+# ==============================================================================
+$UserLogDir = "$env:LOCALAPPDATA\\AutoPC"
+if (-not (Test-Path $UserLogDir)) { New-Item -ItemType Directory -Path $UserLogDir -Force | Out-Null }
+$UserLogFile = "$UserLogDir\\UserLogonSetup.log"
+
+function Write-UserLog {
+    param([string]$Message, [string]$Level = "INFO")
+    $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    $entry = "[$ts] [$Level] $Message"
+    Add-Content -Path $UserLogFile -Value $entry -Encoding UTF8
+    Write-Output $entry
+}
+
+Write-UserLog "AutoPC First-Logon configuration started for user: $env:USERDOMAIN\\$env:USERNAME on $env:COMPUTERNAME"
+
+# --- 1. NETWORK DRIVE MAPPINGS ---
+${activeDrives
+  .map((d) => {
+    return `
+try {
+    $driveLetter = "${d.driveLetter}".TrimEnd(':') + ":"
+    $rawUnc = "${d.uncPath}"
+    $resolvedUnc = $rawUnc.Replace("%USERNAME%", $env:USERNAME)
+    Write-UserLog "Mapping network drive $driveLetter to $resolvedUnc (${d.label})..."
+    
+    # Remove existing conflicting mapping if present
+    if (Get-PSDrive -Name ($driveLetter.TrimEnd(':')) -ErrorAction SilentlyContinue) {
+        net.exe use $driveLetter /delete /yes 2>$null | Out-Null
+    }
+    
+    $mapResult = net.exe use $driveLetter "$resolvedUnc" /persistent:${d.persistent !== false ? 'yes' : 'no'} 2>&1
+    Write-UserLog "Drive $driveLetter successfully mapped to $resolvedUnc" "SUCCESS"
+} catch {
+    Write-UserLog "Error mapping network drive ${d.driveLetter}: $($_.Exception.Message)" "ERROR"
+}
+`;
+  })
+  .join('\n')}
+
+# --- 2. PER-USER NETWORK PRINTERS ---
+${activePrinters
+  .map((p) => {
+    if (p.connectionType === 'PerMachineUNC') {
+      if (p.isDefault) {
+        return `
+try {
+    Write-UserLog "Setting default printer to ${p.pathOrIp}..."
+    (New-Object -ComObject WScript.Network).SetDefaultPrinter("${p.pathOrIp}")
+    Write-UserLog "Default printer set to: ${p.pathOrIp}" "SUCCESS"
+} catch {
+    Write-UserLog "Notice: Could not set default printer: $($_.Exception.Message)" "WARN"
+}
+`;
+      }
+      return '';
+    }
+
+    return `
+try {
+    Write-UserLog "Connecting per-user network printer: ${p.pathOrIp} (${p.name})..."
+    Add-Printer -ConnectionName "${p.pathOrIp}" -ErrorAction Stop
+    Write-UserLog "Connected printer: ${p.pathOrIp}" "SUCCESS"
+    ${
+      p.isDefault
+        ? `(New-Object -ComObject WScript.Network).SetDefaultPrinter("${p.pathOrIp}")
+    Write-UserLog "Default printer assigned to: ${p.pathOrIp}" "SUCCESS"`
+        : ''
+    }
+} catch {
+    Write-UserLog "Notice connecting printer ${p.pathOrIp}: $($_.Exception.Message)" "WARN"
+}
+`;
+  })
+  .join('\n')}
+
+Write-UserLog "AutoPC First-Logon provisioning completed for $env:USERNAME" "SUCCESS"
+'@
+
+Set-Content -Path "$StagingDir\\UserLogonSetup.ps1" -Value $UserLogonScript -Encoding UTF8 -Force
+Write-DeployLog "User logon payload staged at $StagingDir\\UserLogonSetup.ps1" "SUCCESS"
+
+# ------------------------------------------------------------------------------
+# Register Windows Active Setup (Runs once for every new user who signs in)
+# ------------------------------------------------------------------------------
+try {
+    $activeSetupKey = "HKLM:\\SOFTWARE\\Microsoft\\Active Setup\\Installed Components\\AutoPC_UserProvisioning"
+    Write-DeployLog "Registering Active Setup component in registry: $activeSetupKey..."
+    if (-not (Test-Path $activeSetupKey)) {
+        New-Item -Path $activeSetupKey -Force | Out-Null
+    }
+    Set-ItemProperty -Path $activeSetupKey -Name "(Default)" -Value "AutoPC User Logon Provisioning (Drives & Printers)" -Force
+    Set-ItemProperty -Path $activeSetupKey -Name "ComponentID" -Value "AutoPC_UserProvisioning" -Force
+    Set-ItemProperty -Path $activeSetupKey -Name "Version" -Value "1,0,0,1" -Force
+    Set-ItemProperty -Path $activeSetupKey -Name "StubPath" -Value "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -NoProfile -File \`"C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1\`"" -Force
+    Write-DeployLog "Active Setup successfully registered. Every new user logon will execute the staged configuration." "SUCCESS"
+} catch {
+    Write-DeployLog "Warning setting Active Setup key: $($_.Exception.Message)" "WARN"
+}
+
+# ------------------------------------------------------------------------------
+# Register Scheduled Task Backup (Trigger: AtLogOn of BUILTIN\\Users)
+# ------------------------------------------------------------------------------
+try {
+    Write-DeployLog "Registering secondary scheduled task trigger 'AutoPC-UserLogonProvisioning'..."
+    $taskAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -NoProfile -File C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1"
+    $taskTrigger = New-ScheduledTaskTrigger -AtLogOn
+    $taskPrincipal = New-ScheduledTaskPrincipal -GroupId "BUILTIN\\Users" -RunLevel Limited
+    $taskSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+    Register-ScheduledTask -TaskName "AutoPC-UserLogonProvisioning" -Action $taskAction -Trigger $taskTrigger -Principal $taskPrincipal -Settings $taskSettings -Force -ErrorAction SilentlyContinue | Out-Null
+    Write-DeployLog "Scheduled task backup registered (Runs at log on of any user)." "SUCCESS"
+} catch {
+    Write-DeployLog "Note on scheduled task registration: $($_.Exception.Message)" "INFO"
+}
+`
+    : ''
+}
 
 Write-DeployLog "=========================================================="
 Write-DeployLog "Workstation Provisioning Complete for ${customerProfile?.companyName || 'Client'}!" "SUCCESS"

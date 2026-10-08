@@ -29,6 +29,34 @@ export interface SoftwarePackage {
   notes?: string;
 }
 
+export interface NetworkDriveMapping {
+  id: string;
+  driveLetter: string; // e.g., "S:", "P:", "H:"
+  uncPath: string; // e.g., "\\corp-fs01\Shares\Logistics", "\\corp-fs01\Users\%USERNAME%"
+  label: string; // e.g., "Department Shared Documents", "Personal Home Folder"
+  persistent?: boolean; // Default true
+  enabled?: boolean; // Active toggle for this PC deployment
+}
+
+export interface PrinterMapping {
+  id: string;
+  name: string; // e.g., "Office Floor 1 Canon MFP"
+  connectionType: 'PerMachineUNC' | 'UserLogonUNC' | 'DirectIP'; // PerMachine via printui /ga or UserLogon via Active Setup
+  pathOrIp: string; // e.g., "\\corp-print01\ACME-Color-MFP" or "192.168.1.50"
+  driverName?: string;
+  isDefault?: boolean;
+  comment?: string;
+  enabled?: boolean; // Active toggle for this PC deployment
+}
+
+export interface UserLogonStagingConfig {
+  enabled: boolean;
+  stagingPath?: string; // Default: "C:\ProgramData\AutoPC\UserLogonSetup.ps1"
+  activeSetupKey?: string; // Default: "AutoPC_UserProvisioning"
+  scheduledTaskFallback?: boolean; // Register at-logon task as backup
+  cleanUpAfterFirstRun?: boolean;
+}
+
 export interface CustomerProfile {
   id: string;
   companyName: string;
@@ -44,6 +72,10 @@ export interface CustomerProfile {
   packageIds: string[]; // Default software packages assigned to this customer
   packageCustomSwitches?: Record<string, string>; // packageId -> extra switches override
   packageConfigFiles?: Record<string, string>; // packageId -> config file path override
+  // First-Logon Staged User Settings (Network Drives & Printers)
+  networkDrives?: NetworkDriveMapping[];
+  printers?: PrinterMapping[];
+  userLogonStaging?: UserLogonStagingConfig;
   notes?: string;
 }
 
@@ -91,6 +123,9 @@ export interface DeploymentRecord {
   appliedSwitchIds?: string[];
   switchParameters?: Record<string, string | number>;
   systemConfig?: SystemConfigSettings;
+  stagedDrives?: NetworkDriveMapping[];
+  stagedPrinters?: PrinterMapping[];
+  userLogonStaging?: UserLogonStagingConfig;
   logs: Array<{ timestamp: string; level: 'info' | 'warn' | 'error' | 'success'; message: string }>;
   results: {
     packages: Record<string, { status: 'success' | 'failed' | 'skipped'; exitCode?: number; log?: string }>;

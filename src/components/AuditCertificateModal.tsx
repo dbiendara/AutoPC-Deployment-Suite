@@ -147,6 +147,52 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
             </div>
           </div>
 
+          {/* Staged First-Logon Configuration (Drives & Printers) */}
+          {((record.stagedDrives && record.stagedDrives.length > 0) || (record.stagedPrinters && record.stagedPrinters.length > 0)) && (
+            <div>
+              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                <HardDrive className="w-3.5 h-3.5 text-amber-400" />
+                <span>Staged User First-Logon Settings (Active Setup &amp; Machine Printers)</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                {(record.stagedDrives || []).map((drv) => (
+                  <div key={drv.id} className="p-2.5 rounded-lg bg-slate-900 border border-amber-900/40 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="px-1.5 py-0.2 rounded bg-amber-950 border border-amber-800 text-amber-300 font-mono text-[10px] font-bold">
+                          {drv.driveLetter}
+                        </span>
+                        <span className="font-medium text-white truncate">{drv.label}</span>
+                      </div>
+                      <span className="text-[10px] text-cyan-400 font-mono truncate block mt-0.5">{drv.uncPath}</span>
+                    </div>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 font-mono shrink-0 ml-2">
+                      Active Setup
+                    </span>
+                  </div>
+                ))}
+                {(record.stagedPrinters || []).map((prn) => (
+                  <div key={prn.id} className="p-2.5 rounded-lg bg-slate-900 border border-cyan-900/40 flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-medium text-white truncate">{prn.name}</span>
+                        {prn.isDefault && (
+                          <span className="text-[9px] px-1 rounded bg-emerald-950 text-emerald-300 font-bold">
+                            DEFAULT
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono truncate block mt-0.5">{prn.pathOrIp}</span>
+                    </div>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 font-mono shrink-0 ml-2">
+                      {prn.connectionType === 'PerMachineUNC' ? 'PrintUI /ga' : 'Active Setup'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Footer */}
           <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-4">
             <div>

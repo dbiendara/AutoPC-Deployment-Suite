@@ -5,6 +5,9 @@ import {
   SystemConfigSettings,
   SystemConfigSwitch,
   DeploymentRecord,
+  NetworkDriveMapping,
+  PrinterMapping,
+  UserLogonStagingConfig,
 } from './types';
 import { Header } from './components/Header';
 import { NewPCWizard } from './components/NewPCWizard';
@@ -32,6 +35,17 @@ export default function App() {
   const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
   const [packageCustomSwitches, setPackageCustomSwitches] = useState<Record<string, string>>({});
   const [packageConfigFiles, setPackageConfigFiles] = useState<Record<string, string>>({});
+
+  // Staged User First-Logon Settings (Network Drives & Printers)
+  const [stagedDrives, setStagedDrives] = useState<NetworkDriveMapping[]>([]);
+  const [stagedPrinters, setStagedPrinters] = useState<PrinterMapping[]>([]);
+  const [userLogonStaging, setUserLogonStaging] = useState<UserLogonStagingConfig>({
+    enabled: true,
+    stagingPath: 'C:\\ProgramData\\AutoPC\\UserLogonSetup.ps1',
+    activeSetupKey: 'AutoPC_UserProvisioning',
+    scheduledTaskFallback: true,
+    cleanUpAfterFirstRun: false,
+  });
 
   // Dynamic system configuration switch states
   const [enabledSwitchIds, setEnabledSwitchIds] = useState<string[]>(['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby']);
@@ -102,6 +116,15 @@ export default function App() {
             screenTimeoutAc: initialCust.powerPlanSettings?.screenTimeoutAc ?? 15,
             standbyTimeoutAc: initialCust.powerPlanSettings?.standbyTimeoutAc ?? 0,
           }));
+          if (initialCust.networkDrives) {
+            setStagedDrives(initialCust.networkDrives);
+          }
+          if (initialCust.printers) {
+            setStagedPrinters(initialCust.printers);
+          }
+          if (initialCust.userLogonStaging) {
+            setUserLogonStaging(initialCust.userLogonStaging);
+          }
         }
       })
       .catch((err) => console.error('Error fetching initial setup data:', err));
@@ -242,6 +265,15 @@ export default function App() {
         screenTimeoutAc: cust.powerPlanSettings?.screenTimeoutAc ?? 15,
         standbyTimeoutAc: cust.powerPlanSettings?.standbyTimeoutAc ?? 0,
       }));
+      if (cust.networkDrives) {
+        setStagedDrives(cust.networkDrives);
+      }
+      if (cust.printers) {
+        setStagedPrinters(cust.printers);
+      }
+      if (cust.userLogonStaging) {
+        setUserLogonStaging(cust.userLogonStaging);
+      }
     }
     setActiveTab('wizard');
   };
@@ -329,6 +361,12 @@ export default function App() {
             setEnabledSwitchIds={setEnabledSwitchIds}
             switchParameters={switchParameters}
             setSwitchParameters={setSwitchParameters}
+            stagedDrives={stagedDrives}
+            setStagedDrives={setStagedDrives}
+            stagedPrinters={stagedPrinters}
+            setStagedPrinters={setStagedPrinters}
+            userLogonStaging={userLogonStaging}
+            setUserLogonStaging={setUserLogonStaging}
             onOpenSystemConfigManager={() => setIsSystemConfigManagerOpen(true)}
             onDeleteSwitch={handleDeleteSwitch}
             onOpenManualPackageModal={() => setActiveTab('library')}
@@ -350,6 +388,9 @@ export default function App() {
             systemSwitches={systemSwitches}
             enabledSwitchIds={enabledSwitchIds}
             switchParameters={switchParameters}
+            stagedDrives={stagedDrives}
+            stagedPrinters={stagedPrinters}
+            userLogonStaging={userLogonStaging}
             onCompleteDeployment={handleCompleteDeployment}
             onOpenAuditModal={() => setIsAuditModalOpen(true)}
           />
@@ -414,6 +455,9 @@ export default function App() {
         systemSwitches={systemSwitches}
         enabledSwitchIds={enabledSwitchIds}
         switchParameters={switchParameters}
+        stagedDrives={stagedDrives}
+        stagedPrinters={stagedPrinters}
+        userLogonStaging={userLogonStaging}
       />
 
       {/* Workstation Handover Audit Certificate Modal */}

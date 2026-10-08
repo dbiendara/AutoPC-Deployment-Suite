@@ -4,6 +4,9 @@ import {
   CustomerProfile,
   SystemConfigSettings,
   SystemConfigSwitch,
+  NetworkDriveMapping,
+  PrinterMapping,
+  UserLogonStagingConfig,
 } from '../types';
 import {
   Terminal,
@@ -16,6 +19,8 @@ import {
   Building2,
   Sliders,
   FolderOpen,
+  HardDrive,
+  Printer,
 } from 'lucide-react';
 
 interface ScriptModalProps {
@@ -30,6 +35,9 @@ interface ScriptModalProps {
   systemSwitches?: SystemConfigSwitch[];
   enabledSwitchIds?: string[];
   switchParameters?: Record<string, string | number>;
+  stagedDrives?: NetworkDriveMapping[];
+  stagedPrinters?: PrinterMapping[];
+  userLogonStaging?: UserLogonStagingConfig;
 }
 
 export const ScriptModal: React.FC<ScriptModalProps> = ({
@@ -44,6 +52,9 @@ export const ScriptModal: React.FC<ScriptModalProps> = ({
   systemSwitches = [],
   enabledSwitchIds = [],
   switchParameters = {},
+  stagedDrives = [],
+  stagedPrinters = [],
+  userLogonStaging = { enabled: true },
 }) => {
   const [scriptContent, setScriptContent] = useState('');
   const [copiedScript, setCopiedScript] = useState(false);
@@ -74,6 +85,9 @@ export const ScriptModal: React.FC<ScriptModalProps> = ({
         systemConfig,
         selectedSwitchIds: enabledSwitchIds,
         switchParameters,
+        networkDrives: stagedDrives,
+        printers: stagedPrinters,
+        userLogonStaging,
       }),
     })
       .then((res) => res.json())
@@ -94,6 +108,9 @@ export const ScriptModal: React.FC<ScriptModalProps> = ({
     systemConfig,
     enabledSwitchIds,
     switchParameters,
+    stagedDrives,
+    stagedPrinters,
+    userLogonStaging,
   ]);
 
   if (!isOpen) return null;
@@ -169,6 +186,13 @@ export const ScriptModal: React.FC<ScriptModalProps> = ({
               <span>Switches:</span>
               <strong className="text-purple-400">{enabledSwitchIds.length} Tasks</strong>
             </div>
+            {(stagedDrives.length > 0 || stagedPrinters.length > 0) && (
+              <div className="flex items-center space-x-1.5 text-slate-300">
+                <HardDrive className="w-4 h-4 text-amber-400" />
+                <span>First-Logon (Active Setup):</span>
+                <strong className="text-amber-300">{stagedDrives.length} Drives, {stagedPrinters.length} Printers</strong>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">

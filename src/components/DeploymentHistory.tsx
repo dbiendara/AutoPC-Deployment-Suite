@@ -81,6 +81,11 @@ export const DeploymentHistory: React.FC<DeploymentHistoryProps> = ({
                       <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 font-medium">
                         {dep.status}
                       </span>
+                      {(dep.stagedDrives?.length || dep.stagedPrinters?.length) ? (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800 font-mono text-[10px]">
+                          {dep.stagedDrives?.length || 0} Drives, {dep.stagedPrinters?.length || 0} Printers Staged
+                        </span>
+                      ) : null}
                     </div>
                     <p className="text-xs text-slate-400 mt-0.5">
                       Domain: <strong className="text-slate-200 font-mono">{dep.domainName}</strong> • Tech: {dep.technicianName}
