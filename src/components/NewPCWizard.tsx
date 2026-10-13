@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   SoftwarePackage,
   CustomerProfile,
@@ -42,7 +42,13 @@ import {
   FolderOpen,
   Printer,
   Link2,
+  Save,
 } from 'lucide-react';
+import {
+  loadWizardDraft,
+  saveWizardDraft,
+  formatTimeAgo,
+} from '../utils/wizardAutoSave';
 
 interface NewPCWizardProps {
   packages: SoftwarePackage[];
@@ -153,6 +159,125 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
     if (customer.userLogonStaging) {
       setUserLogonStaging(customer.userLogonStaging);
     }
+  };
+
+  // Auto-save state for machine configuration
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved');
+  const [lastSaved, setLastSaved] = useState<string | null>(() => {
+    const existing = loadWizardDraft();
+    return existing ? existing.savedAt : null;
+  });
+  const [restoredFromDraft, setRestoredFromDraft] = useState<boolean>(() => {
+    return Boolean(loadWizardDraft());
+  });
+  const [showDraftNotice, setShowDraftNotice] = useState<boolean>(() => {
+    return Boolean(loadWizardDraft());
+  });
+
+  const isMountedRef = useRef(false);
+
+  // Auto-save changes to local storage whenever selections, switches, or parameters change
+  useEffect(() => {
+    if (!isMountedRef.current) {
+      isMountedRef.current = true;
+      return;
+    }
+
+    if (!customers || customers.length === 0 || !selectedCustomerId) return;
+
+    setSaveStatus('saving');
+    const timer = setTimeout(() => {
+      const saved = saveWizardDraft({
+        machineName,
+        selectedCustomerId,
+        selectedPackageIds,
+        packageCustomSwitches,
+        packageConfigFiles,
+        enabledSwitchIds,
+        switchParameters,
+        systemConfig,
+        stagedDrives,
+        stagedPrinters,
+        userLogonStaging,
+      });
+      setLastSaved(saved.savedAt);
+      setSaveStatus('saved');
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [
+    machineName,
+    selectedCustomerId,
+    selectedPackageIds,
+    packageCustomSwitches,
+    packageConfigFiles,
+    enabledSwitchIds,
+    switchParameters,
+    systemConfig,
+    stagedDrives,
+    stagedPrinters,
+    userLogonStaging,
+    customers,
+  ]);
+
+  // Reset current machine configuration to customer profile defaults
+  const handleResetToCustomerDefaults = () => {
+    if (!currentCustomer) return;
+    setSelectedPackageIds(currentCustomer.packageIds || []);
+    setPackageCustomSwitches(currentCustomer.packageCustomSwitches || {});
+    setPackageConfigFiles(currentCustomer.packageConfigFiles || {});
+    const powerEnabled = currentCustomer.powerPlanSettings?.enabled !== false;
+    setSystemConfig({
+      enableRdp: currentCustomer.enableRdp,
+      addAdGroupToAdmins: true,
+      adAdminGroupName: currentCustomer.defaultAdAdminGroup,
+      setPowerPlan: powerEnabled,
+      screenTimeoutAc: currentCustomer.powerPlanSettings?.screenTimeoutAc ?? 15,
+      standbyTimeoutAc: currentCustomer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+    });
+    setSwitchParameters({
+      adAdminGroupName: currentCustomer.defaultAdAdminGroup,
+      screenTimeoutAc: currentCustomer.powerPlanSettings?.screenTimeoutAc ?? 15,
+      standbyTimeoutAc: currentCustomer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+    });
+    setStagedDrives(currentCustomer.networkDrives || []);
+    setStagedPrinters(currentCustomer.printers || []);
+    if (currentCustomer.userLogonStaging) {
+      setUserLogonStaging(currentCustomer.userLogonStaging);
+    }
+    const resetDraft = saveWizardDraft({
+      machineName,
+      selectedCustomerId: currentCustomer.id,
+      selectedPackageIds: currentCustomer.packageIds || [],
+      packageCustomSwitches: currentCustomer.packageCustomSwitches || {},
+      packageConfigFiles: currentCustomer.packageConfigFiles || {},
+      enabledSwitchIds: ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby'],
+      switchParameters: {
+        adAdminGroupName: currentCustomer.defaultAdAdminGroup,
+        screenTimeoutAc: currentCustomer.powerPlanSettings?.screenTimeoutAc ?? 15,
+        standbyTimeoutAc: currentCustomer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+      },
+      systemConfig: {
+        enableRdp: currentCustomer.enableRdp,
+        addAdGroupToAdmins: true,
+        adAdminGroupName: currentCustomer.defaultAdAdminGroup,
+        setPowerPlan: powerEnabled,
+        screenTimeoutAc: currentCustomer.powerPlanSettings?.screenTimeoutAc ?? 15,
+        standbyTimeoutAc: currentCustomer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+      },
+      stagedDrives: currentCustomer.networkDrives || [],
+      stagedPrinters: currentCustomer.printers || [],
+      userLogonStaging: currentCustomer.userLogonStaging || {
+        enabled: true,
+        stagingPath: 'C:\\ProgramData\\FDIM\\UserLogonSetup.ps1',
+        activeSetupKey: 'FDIM_UserProvisioning',
+        scheduledTaskFallback: true,
+        cleanUpAfterFirstRun: false,
+      },
+    });
+    setLastSaved(resetDraft.savedAt);
+    setSaveStatus('saved');
+    setShowDraftNotice(false);
   };
 
   // State for adding one-off drives/printers in wizard
@@ -312,7 +437,7 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
             </p>
           </div>
 
-          <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl text-xs space-y-1.5 shrink-0 min-w-[250px]">
+          <div className="bg-slate-950 border border-slate-800 p-3.5 rounded-xl text-xs space-y-1.5 shrink-0 min-w-[260px]">
             <div className="flex items-center justify-between text-slate-400">
               <span>Local Hostname:</span>
               <input
@@ -330,9 +455,58 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
               <span>AD Domain:</span>
               <span className="text-slate-300 font-mono">{currentCustomer?.domainName}</span>
             </div>
+            <div className="pt-2 mt-1 border-t border-slate-800 flex items-center justify-between text-[11px]">
+              <div className="flex items-center space-x-1.5 text-slate-400">
+                <Save className={`w-3 h-3 ${saveStatus === 'saving' ? 'text-amber-400 animate-spin' : 'text-emerald-400'}`} />
+                <span className={saveStatus === 'saving' ? 'text-amber-300' : 'text-emerald-300 font-medium'}>
+                  {saveStatus === 'saving' ? 'Saving draft...' : `Draft auto-saved (${formatTimeAgo(lastSaved || undefined)})`}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleResetToCustomerDefaults}
+                title="Reset selections, switches and parameters to profile defaults"
+                className="text-slate-400 hover:text-cyan-400 flex items-center space-x-1 cursor-pointer transition-colors"
+              >
+                <RotateCcw className="w-2.5 h-2.5" />
+                <span>Reset</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Restored Draft Notice Banner */}
+      {restoredFromDraft && showDraftNotice && (
+        <div className="bg-cyan-950/40 border border-cyan-800/80 rounded-xl p-3 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-md">
+          <div className="flex items-center space-x-2.5">
+            <div className="w-7 h-7 rounded-lg bg-cyan-900/60 border border-cyan-700/60 flex items-center justify-center shrink-0">
+              <Save className="w-3.5 h-3.5 text-cyan-300" />
+            </div>
+            <div>
+              <span className="font-semibold text-cyan-200">Restored active machine configuration draft</span>
+              <span className="text-slate-300 ml-1.5">
+                (Saved {formatTimeAgo(lastSaved || undefined)}) — Your custom package selections, switches, and parameters are preserved from your previous session.
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+            <button
+              onClick={handleResetToCustomerDefaults}
+              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-medium flex items-center space-x-1 cursor-pointer transition-colors"
+            >
+              <RotateCcw className="w-3 h-3 text-cyan-400" />
+              <span>Reset to Profile Defaults</span>
+            </button>
+            <button
+              onClick={() => setShowDraftNotice(false)}
+              className="px-2.5 py-1.5 rounded-lg bg-cyan-900/40 hover:bg-cyan-900/70 text-cyan-200 border border-cyan-700/60 text-[11px] font-medium cursor-pointer transition-colors"
+            >
+              Keep Draft
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Step 1: Customer / Company Profiles Selection */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md">
@@ -1109,6 +1283,10 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
             <strong className="text-emerald-400">{selectedPackageIds.length} Packages</strong> •{' '}
             <strong className="text-purple-400">{enabledSwitchIds.length} Switches</strong> •{' '}
             <strong className="text-amber-300 font-mono">{stagedDrives.filter((d) => d.enabled !== false).length} Drives, {stagedPrinters.filter((p) => p.enabled !== false).length} Printers Staged</strong> • ~{totalEstimatedMinutes} min
+            <span className="inline-flex items-center space-x-1 ml-2 px-1.5 py-0.5 rounded bg-emerald-950/70 border border-emerald-800/60 text-emerald-300 font-medium text-[11px]">
+              <Save className="w-3 h-3 text-emerald-400" />
+              <span>Auto-saved</span>
+            </span>
           </p>
         </div>
 

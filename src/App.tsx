@@ -24,6 +24,7 @@ import { AuditCertificateModal } from './components/AuditCertificateModal';
 import { SystemConfigManager } from './components/SystemConfigManager';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginModal } from './components/LoginModal';
+import { loadWizardDraft } from './utils/wizardAutoSave';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'wizard' | 'quick-deploy' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers'>('wizard');
@@ -67,19 +68,20 @@ export default function App() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-  // Machine state (already in local Active Directory with hostname set)
-  const [machineName, setMachineName] = useState('ACME-WS-084');
+  // Machine state (persisted via local storage draft)
+  const initialDraft = loadWizardDraft();
+  const [machineName, setMachineName] = useState(() => initialDraft?.machineName || 'ACME-WS-084');
 
   // Selected customer profile
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('cust-acme');
-  const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
-  const [packageCustomSwitches, setPackageCustomSwitches] = useState<Record<string, string>>({});
-  const [packageConfigFiles, setPackageConfigFiles] = useState<Record<string, string>>({});
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>(() => initialDraft?.selectedCustomerId || 'cust-acme');
+  const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>(() => initialDraft?.selectedPackageIds || []);
+  const [packageCustomSwitches, setPackageCustomSwitches] = useState<Record<string, string>>(() => initialDraft?.packageCustomSwitches || {});
+  const [packageConfigFiles, setPackageConfigFiles] = useState<Record<string, string>>(() => initialDraft?.packageConfigFiles || {});
 
   // Staged User First-Logon Settings (Network Drives & Printers)
-  const [stagedDrives, setStagedDrives] = useState<NetworkDriveMapping[]>([]);
-  const [stagedPrinters, setStagedPrinters] = useState<PrinterMapping[]>([]);
-  const [userLogonStaging, setUserLogonStaging] = useState<UserLogonStagingConfig>({
+  const [stagedDrives, setStagedDrives] = useState<NetworkDriveMapping[]>(() => initialDraft?.stagedDrives || []);
+  const [stagedPrinters, setStagedPrinters] = useState<PrinterMapping[]>(() => initialDraft?.stagedPrinters || []);
+  const [userLogonStaging, setUserLogonStaging] = useState<UserLogonStagingConfig>(() => initialDraft?.userLogonStaging || {
     enabled: true,
     stagingPath: 'C:\\ProgramData\\FDIM\\UserLogonSetup.ps1',
     activeSetupKey: 'FDIM_UserProvisioning',
@@ -88,15 +90,15 @@ export default function App() {
   });
 
   // Dynamic system configuration switch states
-  const [enabledSwitchIds, setEnabledSwitchIds] = useState<string[]>(['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby']);
-  const [switchParameters, setSwitchParameters] = useState<Record<string, string | number>>({
+  const [enabledSwitchIds, setEnabledSwitchIds] = useState<string[]>(() => initialDraft?.enabledSwitchIds || ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby']);
+  const [switchParameters, setSwitchParameters] = useState<Record<string, string | number>>(() => initialDraft?.switchParameters || {
     adAdminGroupName: 'ACME\\IT-Workstation-Admins',
     screenTimeoutAc: 15,
     standbyTimeoutAc: 0,
   });
 
   // Legacy system configuration settings (kept in sync)
-  const [systemConfig, setSystemConfig] = useState<SystemConfigSettings>({
+  const [systemConfig, setSystemConfig] = useState<SystemConfigSettings>(() => initialDraft?.systemConfig || {
     enableRdp: true,
     addAdGroupToAdmins: true,
     adAdminGroupName: 'ACME\\IT-Workstation-Admins',
@@ -130,45 +132,82 @@ export default function App() {
         if (sets) setAppSettings(sets);
         if (auth?.user) setCurrentUser(auth.user);
 
-        if (Array.isArray(switches)) {
-          const defaultEnabled = switches.filter((s: SystemConfigSwitch) => s.enabledByDefault).map((s: SystemConfigSwitch) => s.id);
-          setEnabledSwitchIds(defaultEnabled.length > 0 ? defaultEnabled : ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby']);
-        }
+        // Check if there is an active draft saved in local storage
+        const currentSavedDraft = loadWizardDraft();
+        if (currentSavedDraft) {
+          if (currentSavedDraft.machineName) setMachineName(currentSavedDraft.machineName);
+          if (currentSavedDraft.selectedCustomerId) {
+            const validCust = (custs || []).find((c: CustomerProfile) => c.id === currentSavedDraft.selectedCustomerId);
+            setSelectedCustomerId(validCust ? validCust.id : ((custs || [])[0]?.id || currentSavedDraft.selectedCustomerId));
+          }
+          if (Array.isArray(currentSavedDraft.selectedPackageIds)) {
+            setSelectedPackageIds(currentSavedDraft.selectedPackageIds);
+          }
+          if (currentSavedDraft.packageCustomSwitches) {
+            setPackageCustomSwitches(currentSavedDraft.packageCustomSwitches);
+          }
+          if (currentSavedDraft.packageConfigFiles) {
+            setPackageConfigFiles(currentSavedDraft.packageConfigFiles);
+          }
+          if (Array.isArray(currentSavedDraft.enabledSwitchIds)) {
+            setEnabledSwitchIds(currentSavedDraft.enabledSwitchIds);
+          }
+          if (currentSavedDraft.switchParameters) {
+            setSwitchParameters(currentSavedDraft.switchParameters);
+          }
+          if (currentSavedDraft.systemConfig) {
+            setSystemConfig(currentSavedDraft.systemConfig);
+          }
+          if (Array.isArray(currentSavedDraft.stagedDrives)) {
+            setStagedDrives(currentSavedDraft.stagedDrives);
+          }
+          if (Array.isArray(currentSavedDraft.stagedPrinters)) {
+            setStagedPrinters(currentSavedDraft.stagedPrinters);
+          }
+          if (currentSavedDraft.userLogonStaging) {
+            setUserLogonStaging(currentSavedDraft.userLogonStaging);
+          }
+        } else {
+          if (Array.isArray(switches)) {
+            const defaultEnabled = switches.filter((s: SystemConfigSwitch) => s.enabledByDefault).map((s: SystemConfigSwitch) => s.id);
+            setEnabledSwitchIds(defaultEnabled.length > 0 ? defaultEnabled : ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby']);
+          }
 
-        // Initial default customer setup
-        const initialCust = (custs || [])[0];
-        if (initialCust) {
-          setSelectedCustomerId(initialCust.id);
-          setSelectedPackageIds(initialCust.packageIds || []);
-          if (initialCust.packageCustomSwitches) {
-            setPackageCustomSwitches(initialCust.packageCustomSwitches);
-          }
-          if (initialCust.packageConfigFiles) {
-            setPackageConfigFiles(initialCust.packageConfigFiles);
-          }
-          const powerEnabled = initialCust.powerPlanSettings?.enabled !== false;
-          setSystemConfig({
-            enableRdp: initialCust.enableRdp,
-            addAdGroupToAdmins: true,
-            adAdminGroupName: initialCust.defaultAdAdminGroup,
-            setPowerPlan: powerEnabled,
-            screenTimeoutAc: initialCust.powerPlanSettings?.screenTimeoutAc ?? 15,
-            standbyTimeoutAc: initialCust.powerPlanSettings?.standbyTimeoutAc ?? 0,
-          });
-          setSwitchParameters((prev) => ({
-            ...prev,
-            adAdminGroupName: initialCust.defaultAdAdminGroup,
-            screenTimeoutAc: initialCust.powerPlanSettings?.screenTimeoutAc ?? 15,
-            standbyTimeoutAc: initialCust.powerPlanSettings?.standbyTimeoutAc ?? 0,
-          }));
-          if (initialCust.networkDrives) {
-            setStagedDrives(initialCust.networkDrives);
-          }
-          if (initialCust.printers) {
-            setStagedPrinters(initialCust.printers);
-          }
-          if (initialCust.userLogonStaging) {
-            setUserLogonStaging(initialCust.userLogonStaging);
+          // Initial default customer setup if no draft was present
+          const initialCust = (custs || [])[0];
+          if (initialCust) {
+            setSelectedCustomerId(initialCust.id);
+            setSelectedPackageIds(initialCust.packageIds || []);
+            if (initialCust.packageCustomSwitches) {
+              setPackageCustomSwitches(initialCust.packageCustomSwitches);
+            }
+            if (initialCust.packageConfigFiles) {
+              setPackageConfigFiles(initialCust.packageConfigFiles);
+            }
+            const powerEnabled = initialCust.powerPlanSettings?.enabled !== false;
+            setSystemConfig({
+              enableRdp: initialCust.enableRdp,
+              addAdGroupToAdmins: true,
+              adAdminGroupName: initialCust.defaultAdAdminGroup,
+              setPowerPlan: powerEnabled,
+              screenTimeoutAc: initialCust.powerPlanSettings?.screenTimeoutAc ?? 15,
+              standbyTimeoutAc: initialCust.powerPlanSettings?.standbyTimeoutAc ?? 0,
+            });
+            setSwitchParameters((prev) => ({
+              ...prev,
+              adAdminGroupName: initialCust.defaultAdAdminGroup,
+              screenTimeoutAc: initialCust.powerPlanSettings?.screenTimeoutAc ?? 15,
+              standbyTimeoutAc: initialCust.powerPlanSettings?.standbyTimeoutAc ?? 0,
+            }));
+            if (initialCust.networkDrives) {
+              setStagedDrives(initialCust.networkDrives);
+            }
+            if (initialCust.printers) {
+              setStagedPrinters(initialCust.printers);
+            }
+            if (initialCust.userLogonStaging) {
+              setUserLogonStaging(initialCust.userLogonStaging);
+            }
           }
         }
       })

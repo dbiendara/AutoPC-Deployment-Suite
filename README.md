@@ -10,16 +10,46 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 
 ## 🚀 Key Features
 
+### 💾 Workstation Wizard Auto-Save & Draft Persistence
+- **Continuous Local Storage Persistence**: The New PC Provisioning Wizard automatically saves your in-progress machine configuration to browser `localStorage` with a smooth 300ms debounce.
+- **Full Configuration Retention**: Preserves target hostname (`machineName`), selected customer profile, software package selections, per-package custom switches and `.tvopt` configuration files, dynamic system switches, parameter values (such as AD admin groups and timeout values), staged network drives, staged printers, and first-logon provisioning settings.
+- **Zero-Loss Workflow**: Technicians can freely navigate between tabs (Customer Profiles, Software Library, Deployment History, System Switches, App Settings) or refresh/close the browser without losing their tailored deployment parameters.
+- **Visual Status Badges**:
+  - Live draft status indicator in the top header card (*Draft auto-saved (Just now / 2m ago)* or *Saving draft...*).
+  - Restoration alert banner upon returning with a saved draft.
+  - One-click **Reset to Profile Defaults** button to instantly revert to clean customer profile defaults at any time.
+  - Persistence indicator badge in the zero-touch deployment launcher bar.
+
 ### 🏢 Customer & Multi-Tenant Profiles
 - **Client Organization Management**: Maintain isolated configuration profiles for different companies, branches, or customer domains (e.g., Acme Industrial, MediCare Solutions, CloudScale Tech).
 - **Domain & AD Group Automation**: Predefine customer domain names, target delegated Active Directory administrative groups, and primary UNC software repository paths.
 - **Default Software Blueprints**: Assign company-specific default software packages that are automatically pre-selected when launching the deployment wizard.
+- **Profile Deletion with Safety Validation**: Easily delete obsolete customer profiles directly from profile cards (trash icon) or inside the editor modal. A confirmation modal displays company details, domain, and mapped resources before permanent removal, with automatic fallback to prevent orphaned states.
+
+### ⚡ Quick Software Deployment Mode
+- **Rapid Software-Only Rollouts**: Dedicated workflow for existing, already-configured workstations that only require new software installations or silent application patching without running operating system provisioning tasks.
+- **Batch Selection**: Select target machines, domain, and one or more UNC / Winget packages.
+- **Instant PowerShell Script Generation & Execution**: Generate hardened unattended install scripts or trigger deployment instantly.
+
+### 🔐 Enterprise Authentication & Role Management
+- **Multi-Mode Authentication Engine**:
+  - **Local Accounts**: Built-in technician credentials with role-based access control (RBAC).
+  - **Active Directory / LDAP**: Real-time integration with corporate domain controllers via secure LDAPS (`ldaps://...:636`), customizable Base DN, bind service accounts, user search filters (`sAMAccountName={username}`), and AD admin group mapping.
+  - **Keycloak / OIDC**: Enterprise Single Sign-On (SSO) integration supporting OpenID Connect realms, client credentials, and token validation.
+- **Global Settings Manager**: Dedicated settings modal to configure default corporate domain roots and authentication provider settings.
+
+### 🤖 AI Installer Detective (Powered by Google Gemini)
+- **Automated Silent Switch Discovery**: Analyze unknown, third-party, or legacy setup executables to identify silent installation flags (`/S`, `/silent`, `/qn`, `/VERYSILENT`).
+- **Hanging & Dialog Detection**: Detect potential interactive prompts, reboot requests, or blocking dialogs that could stall zero-touch deployments, providing recommended timeout and containment parameters.
+
+### 🗄️ Native SQLite Persistent Storage
+- **Built-in Node.js SQLite (`node:sqlite`)**: Lightweight, zero-native-compilation database engine providing reliable persistent storage across server restarts for customer profiles, software packages, system switches, app settings, and deployment logs.
 
 ### 🛡️ Enterprise Active Directory & System Configuration Switches
 - **Tailored for Existing Domain Members**: Optimized for PCs that already have hostnames (`$env:COMPUTERNAME`) and domain membership—no redundant serial numbers or employee assignee overhead.
 - **Enable Remote Desktop (RDP)**: Configures Terminal Server registry keys, enforces Network Level Authentication (NLA), and unblocks Remote Desktop in Windows Defender Firewall.
 - **Delegate AD Groups to Local Administrators**: Automatically adds specified Active Directory security groups (e.g., `DOMAIN\IT-DesktopAdmins`) into the local `Administrators` security group with domain resolution safety checks.
-- **Power Management (powercfg)**: Standardizes AC monitor sleep and standby/sleep timeouts via `powercfg.exe` to prevent workstations from sleeping during maintenance windows or user shifts.
+- **Power Management (powercfg)**: Standardizes AC monitor sleep and standby/sleep timeouts via `powercfg.exe` to prevent workstations from sleeping during maintenance windows or user shifts. Optional switch toggle allows technicians to disable power scheme enforcement when desired.
 - **Dynamic Switch Manager**: Technicians can create, modify, or retire custom system configuration switches with dynamic input parameters and custom PowerShell script snippets.
 
 ### 📦 UNC Software Catalog & Winget Package Manager Integration
@@ -62,32 +92,41 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 
 ---
 
-## 🏗️ Architecture & Tech Stack
+### 🏗️ Architecture & Tech Stack
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                       Client Browser                        │
-│   React 19 • Vite • Tailwind CSS • Lucide Icons • Motion   │
-│                                                             │
-│  ┌─────────────────┐ ┌──────────────────┐ ┌───────────────┐ │
-│  │ New PC Wizard   │ │ Customer Manager │ │ UNC Catalog   │ │
-│  ├─────────────────┤ ├──────────────────┤ ├───────────────┤ │
-│  │ System Switches │ │ Live Runner      │ │ Audit Logs    │ │
-│  └─────────────────┘ └──────────────────┘ └───────────────┘ │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ HTTP / JSON REST APIs
-┌──────────────────────────────▼──────────────────────────────┐
-│                     Node.js / Express                       │
-│                     (server.ts / tsx)                       │
-│                                                             │
-│  • Customer Profiles Store    • System Switches Engine      │
-│  • Software Catalog API       • PowerShell Script Synthesizer│
-│  • Deployment History Store   • Optional Gemini AI Analysis │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                               Client Browser                                │
+│        React 19 • Vite • Tailwind CSS • Lucide Icons • Motion               │
+│                                                                             │
+│  ┌───────────────────────┐ ┌───────────────────────┐ ┌───────────────────┐  │
+│  │ New PC Wizard         │ │ Quick Software Deploy │ │ AI Detective      │  │
+│  │ (Auto-Save to Storage)│ │ (Fast Batch App Run)  │ │ (Gemini Analysis) │  │
+│  ├───────────────────────┤ ├───────────────────────┤ ├───────────────────┤  │
+│  │ Customer Profiles     │ │ Package Library       │ │ System Switches   │  │
+│  │ (Multi-Tenant & Blueprints) (UNC & Winget Catalog) │ (PowerShell Rules)│  │
+│  ├───────────────────────┤ ├───────────────────────┤ ├───────────────────┤  │
+│  │ Live Runner           │ │ Deployment History    │ │ Auth & Settings   │  │
+│  │ (Real-Time Terminal)  │ │ (Audit Certificates)  │ │ (AD/LDAP/Keycloak)│  │
+│  └───────────────────────┘ └───────────────────────┘ └───────────────────┘  │
+│                                      │                                      │
+│                  Browser LocalStorage Draft Cache (300ms)                   │
+└──────────────────────────────────────┬──────────────────────────────────────┘
+                                       │ HTTP / JSON REST APIs
+┌──────────────────────────────────────▼──────────────────────────────────────┐
+│                              Node.js / Express                              │
+│                              (server.ts / tsx)                              │
+│                                                                             │
+│  • Customer Profiles Store          • Dynamic System Switches Engine        │
+│  • Software Catalog API             • PowerShell Script Synthesizer         │
+│  • Deployment History & Audit Logs  • Google Gemini AI Installer Analysis   │
+│  • AD/LDAP & Keycloak Auth Proxy    • Native SQLite Engine (node:sqlite)    │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS v4](https://tailwindcss.com/), [Lucide React](https://lucide.dev/), [Motion](https://motion.dev/)
-- **Backend**: [Express 4](https://expressjs.com/), [Node.js](https://nodejs.org/), [tsx](https://github.com/privatenumber/tsx)
+- **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS v4](https://tailwindcss.com/), [Lucide React](https://lucide.dev/), [Motion](https://motion.dev/), Browser `localStorage` Draft Engine
+- **Backend**: [Express 4](https://expressjs.com/), [Node.js](https://nodejs.org/) (v22+), [tsx](https://github.com/privatenumber/tsx), built-in `node:sqlite` database
+- **AI Engine**: `@google/genai` (Google Gemini 2.5) for silent argument detection & hanging installer risk analysis
 - **Deployment Script Target**: Microsoft Windows 10/11 Pro & Enterprise, Windows Server, PowerShell 5.1 & PowerShell 7+
 
 ---
@@ -95,27 +134,33 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 ## 📁 Repository Structure
 
 ```
-├── server.ts                       # Express backend & PowerShell script generator
+├── server.ts                             # Express backend, SQLite tables & PowerShell script synthesizer
 ├── src/
-│   ├── main.tsx                    # React client entry point
-│   ├── App.tsx                     # Main application layout and state coordination
-│   ├── index.css                   # Global styling with Tailwind CSS imports
+│   ├── main.tsx                          # React client entry point
+│   ├── App.tsx                           # Main application layout, auth state & tab routing
+│   ├── index.css                         # Global styling with Tailwind CSS imports
 │   ├── types/
-│   │   └── index.ts                # TypeScript interfaces (Profiles, Packages, Switches)
+│   │   └── index.ts                      # TypeScript interfaces (Profiles, Packages, Switches, Auth)
+│   ├── utils/
+│   │   └── wizardAutoSave.ts             # LocalStorage persistence & draft recovery engine
 │   └── components/
-│       ├── Header.tsx              # Main navigation & deployment summary bar
-│       ├── NewPCWizard.tsx         # 3-step PC deployment wizard
-│       ├── CustomerProfilesManager.tsx # Customer profiles & default software manager
-│       ├── PackageLibrary.tsx      # UNC Software catalog & manual package creator
-│       ├── SystemConfigManager.tsx # Enterprise system switches configuration
-│       ├── LiveRunner.tsx          # Real-time execution console & simulator
-│       ├── DeploymentHistory.tsx   # Past deployment audit logs
-│       ├── ScriptModal.tsx         # PowerShell script preview, copy & download
-│       └── AuditCertificateModal.tsx # Post-deployment compliance certificate
-├── metadata.json                   # Applet metadata & permission declarations
-├── package.json                    # Dependencies and npm scripts
-├── tsconfig.json                   # TypeScript configuration
-└── vite.config.ts                  # Vite build configuration
+│       ├── Header.tsx                    # Main navigation bar, active profile indicator & auth menu
+│       ├── NewPCWizard.tsx               # Workstation provisioning wizard with auto-save & reset
+│       ├── QuickSoftwareDeploy.tsx       # Rapid standalone software deployment for existing PCs
+│       ├── CustomerProfilesManager.tsx   # Customer multi-tenant profiles & safe profile deletion
+│       ├── PackageLibrary.tsx            # UNC & Winget software catalog with manual package creator
+│       ├── AIDetective.tsx               # Gemini-powered installer analysis & silent switch discovery
+│       ├── SystemConfigManager.tsx       # Enterprise dynamic system switches configuration
+│       ├── LiveRunner.tsx                # Real-time execution console & interactive simulator
+│       ├── DeploymentHistory.tsx         # Past deployment audit logs & export
+│       ├── ScriptModal.tsx               # PowerShell script preview, copy & download
+│       ├── AuditCertificateModal.tsx     # Post-deployment compliance certificate viewer
+│       ├── SettingsModal.tsx             # Global domain & AD/LDAP/Keycloak authentication settings
+│       └── LoginModal.tsx                # User authentication dialog (Local / AD / Keycloak)
+├── metadata.json                         # Applet metadata & permission declarations
+├── package.json                          # Dependencies and npm scripts
+├── tsconfig.json                         # TypeScript configuration
+└── vite.config.ts                        # Vite build configuration
 ```
 
 ---
@@ -163,36 +208,51 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 
 ## 📖 Deployment Workflow
 
-### 1. Configure Customer Profiles
+### 1. Configure & Manage Customer Profiles
 Navigate to the **Customer Profiles** tab:
 1. Click **+ Add Customer Profile**.
 2. Enter the customer company name, unique customer code, Active Directory domain name (FQDN or NetBIOS), delegated AD admin group name, and primary UNC repository path.
 3. Select which software packages should be assigned as **Default Software** for all new workstations deployed under this profile.
-4. Save the profile.
+4. Configure optional mapped network drives, network printers, and user first-logon staging.
+5. Save the profile.
+6. **Profile Deletion**: To delete an obsolete profile, click the **Trash icon** (🗑️) on the profile card or click **Delete Profile** inside the edit modal, then confirm in the validation prompt.
 
 ### 2. Manage System Configuration Switches
 Navigate to **System Switches**:
 1. Review or toggle default switches:
    - **Enable Remote Desktop**: Enables RDP, sets NLA, and adds firewall exceptions.
    - **Add AD Group to Administrators**: Adds `DOMAIN\Group` to the local Administrators group.
-   - **Power Plan**: Configures monitor off (AC) and standby timeout (AC) via `powercfg`.
+   - **Power Plan**: Standardizes monitor off (AC) and standby timeout (AC) via `powercfg`.
 2. Click **+ Add Custom Switch** to register additional company policies (e.g., disable Fast Startup, map network drives, or configure corporate proxy).
 
-### 3. Register UNC Software Packages
+### 3. Register UNC Software Packages & Winget Items
 Navigate to the **UNC Catalog**:
 1. Use **+ Add Package Manually** to register internal software installers without needing AI.
-2. Select your installer architecture (MSI, Inno Setup, NSIS, WiX, or TeamViewer Host).
-3. Specify the UNC network path (`\\fileserver\deploy\App.exe`).
-4. Enter silent flags, extra parameters, configuration files, and detection rules (registry path or file path).
+2. Select your installer architecture (MSI, Inno Setup, NSIS, WiX, Winget, or TeamViewer Host).
+3. Specify the UNC network path (`\\fileserver\deploy\App.exe`) or Winget Package ID (`VideoLAN.VLC`).
+4. Enter silent flags, extra parameters, configuration files (e.g. `.tvopt`), and detection rules (registry path or file path).
 
-### 4. Deploy a New Workstation
-Navigate to **Deploy New PC**:
+### 4. Deploy a New Workstation (New PC Wizard)
+Navigate to **New PC Setup**:
 - **Step 1 - Profile & Hostname**: Select the Customer Profile. The workstation hostname defaults to `$env:COMPUTERNAME` (or you can override it for target generation).
 - **Step 2 - System Configuration**: Review active switches and adjust parameters (such as the specific AD Admin group or timeout minutes).
 - **Step 3 - Software Selection**: Default customer software is automatically selected. Check or uncheck packages as needed.
+- **Step 4 - Network Drives & Printers**: Review staged network resources for machine-wide setup and first-user logon mapping.
+- **Auto-Save Protection**: Every selection, switch toggle, and parameter edit is automatically persisted to local storage in real-time. If you switch tabs or reload the browser, your configuration is restored with a notification badge, or you can click **Reset to Profile Defaults** to revert.
 - **Launch Execution**:
-  - Click **Generate Script (.ps1)** to inspect, copy, or download the PowerShell script.
-  - Click **Launch Deployment Runner** to test execution in the live step-by-step console.
+  - Click **Generate PowerShell Script** to inspect, copy, or download the self-logging script.
+  - Click **Run Zero-Touch Deployment** to test execution in the live step-by-step console.
+
+### 5. Quick Software Deployment (Existing Machines)
+Navigate to **Quick Deploy**:
+1. For existing workstations that do not require full OS provisioning, enter target hostname(s) and domain.
+2. Select the desired software packages from the UNC share or Winget catalog.
+3. Instantly run the silent installation or generate standalone execution scripts.
+
+### 6. Analyze Unknown Installers (AI Detective)
+Navigate to **AI Detective**:
+1. Input installer details (installer filename, vendor, version, or command behavior).
+2. Let Google Gemini inspect the installer structure to recommend tested silent switches, highlight potential hanging dialog risks, and provide complete unattended execution commands.
 
 ---
 
