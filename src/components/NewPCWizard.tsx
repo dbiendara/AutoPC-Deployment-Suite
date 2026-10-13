@@ -129,18 +129,20 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
     if (customer.packageConfigFiles) {
       setPackageConfigFiles(customer.packageConfigFiles);
     }
+    const powerEnabled = customer.powerPlanSettings?.enabled !== false;
     setSystemConfig((prev) => ({
       ...prev,
       enableRdp: customer.enableRdp,
       adAdminGroupName: customer.defaultAdAdminGroup,
-      screenTimeoutAc: customer.powerPlanSettings.screenTimeoutAc,
-      standbyTimeoutAc: customer.powerPlanSettings.standbyTimeoutAc,
+      setPowerPlan: powerEnabled,
+      screenTimeoutAc: customer.powerPlanSettings?.screenTimeoutAc ?? 15,
+      standbyTimeoutAc: customer.powerPlanSettings?.standbyTimeoutAc ?? 0,
     }));
     setSwitchParameters((prev) => ({
       ...prev,
       adAdminGroupName: customer.defaultAdAdminGroup,
-      screenTimeoutAc: customer.powerPlanSettings.screenTimeoutAc,
-      standbyTimeoutAc: customer.powerPlanSettings.standbyTimeoutAc,
+      screenTimeoutAc: customer.powerPlanSettings?.screenTimeoutAc ?? 15,
+      standbyTimeoutAc: customer.powerPlanSettings?.standbyTimeoutAc ?? 0,
     }));
     if (customer.networkDrives) {
       setStagedDrives(customer.networkDrives);

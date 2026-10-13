@@ -65,7 +65,8 @@ export interface CustomerProfile {
   defaultAdAdminGroup: string;
   uncShareRoot: string;
   enableRdp: boolean;
-  powerPlanSettings: {
+  powerPlanSettings?: {
+    enabled?: boolean;
     screenTimeoutAc: number;
     standbyTimeoutAc: number;
   };
@@ -116,6 +117,7 @@ export interface DeploymentRecord {
   domainName: string;
   customerProfileId: string;
   customerCompanyName: string;
+  deploymentType?: 'FullStaging' | 'QuickSoftwareInstall';
   status: 'In Progress' | 'Completed' | 'Failed';
   startedAt: string;
   completedAt?: string;
@@ -132,6 +134,36 @@ export interface DeploymentRecord {
     systemConfigs: Record<string, { status: 'success' | 'failed' | 'skipped'; log?: string }>;
   };
   technicianName: string;
+}
+
+export interface AppSettings {
+  defaultGlobalDomain: string;
+  authMode: 'local' | 'active_directory' | 'keycloak';
+  adLdapConfig: {
+    ldapUrl: string;
+    domain: string;
+    baseDn: string;
+    bindDn: string;
+    userSearchFilter: string;
+    adminGroup: string;
+  };
+  keycloakConfig: {
+    serverUrl: string;
+    realm: string;
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
+  };
+}
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  displayName: string;
+  domain?: string;
+  role: 'Administrator' | 'Technician' | 'Operator';
+  authProvider: 'local' | 'active_directory' | 'keycloak';
+  avatarInitials?: string;
 }
 
 export interface AIDetectionResult {

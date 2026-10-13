@@ -8,9 +8,12 @@ import {
   NetworkDriveMapping,
   PrinterMapping,
   UserLogonStagingConfig,
+  AppSettings,
+  AuthUser,
 } from './types';
 import { Header } from './components/Header';
 import { NewPCWizard } from './components/NewPCWizard';
+import { QuickSoftwareDeploy } from './components/QuickSoftwareDeploy';
 import { LiveRunner } from './components/LiveRunner';
 import { AIDetective } from './components/AIDetective';
 import { CustomerProfilesManager } from './components/CustomerProfilesManager';
@@ -19,13 +22,50 @@ import { DeploymentHistory } from './components/DeploymentHistory';
 import { ScriptModal } from './components/ScriptModal';
 import { AuditCertificateModal } from './components/AuditCertificateModal';
 import { SystemConfigManager } from './components/SystemConfigManager';
+import { SettingsModal } from './components/SettingsModal';
+import { LoginModal } from './components/LoginModal';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'wizard' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers'>('wizard');
+  const [activeTab, setActiveTab] = useState<'wizard' | 'quick-deploy' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers'>('wizard');
   const [packages, setPackages] = useState<SoftwarePackage[]>([]);
   const [customers, setCustomers] = useState<CustomerProfile[]>([]);
   const [deployments, setDeployments] = useState<DeploymentRecord[]>([]);
   const [systemSwitches, setSystemSwitches] = useState<SystemConfigSwitch[]>([]);
+
+  // App Settings & Auth User state
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    defaultGlobalDomain: 'corp.internal.net',
+    authMode: 'local',
+    adLdapConfig: {
+      ldapUrl: 'ldaps://dc01.corp.internal.net:636',
+      domain: 'CORP',
+      baseDn: 'DC=corp,DC=internal,DC=net',
+      bindDn: 'CN=svc_fdim,OU=ServiceAccounts,DC=corp,DC=internal,DC=net',
+      userSearchFilter: '(sAMAccountName={username})',
+      adminGroup: 'FDIM-Admins',
+    },
+    keycloakConfig: {
+      serverUrl: 'https://keycloak.corp.internal.net',
+      realm: 'enterprise',
+      clientId: 'fdim-suite',
+      clientSecret: '',
+      redirectUri: 'https://fdim.corp.internal.net/oauth/callback',
+    },
+  });
+
+  const [currentUser, setCurrentUser] = useState<AuthUser>({
+    id: 'usr-admin',
+    username: 'admin',
+    displayName: 'FDIM Domain Administrator',
+    domain: 'CORP',
+    role: 'Administrator',
+    authProvider: 'local',
+    avatarInitials: 'DA',
+  });
+
+  // Modals state
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   // Machine state (already in local Active Directory with hostname set)
   const [machineName, setMachineName] = useState('ACME-WS-084');
@@ -79,12 +119,16 @@ export default function App() {
       fetch('/api/profiles').then((r) => r.json()),
       fetch('/api/system-switches').then((r) => r.json()),
       fetch('/api/deployments').then((r) => r.json()),
+      fetch('/api/settings').then((r) => r.json()).catch(() => null),
+      fetch('/api/auth/me').then((r) => r.json()).catch(() => null),
     ])
-      .then(([pkgs, custs, switches, deps]) => {
+      .then(([pkgs, custs, switches, deps, sets, auth]) => {
         setPackages(pkgs || []);
         setCustomers(custs || []);
         setSystemSwitches(switches || []);
         setDeployments(deps || []);
+        if (sets) setAppSettings(sets);
+        if (auth?.user) setCurrentUser(auth.user);
 
         if (Array.isArray(switches)) {
           const defaultEnabled = switches.filter((s: SystemConfigSwitch) => s.enabledByDefault).map((s: SystemConfigSwitch) => s.id);
@@ -102,11 +146,12 @@ export default function App() {
           if (initialCust.packageConfigFiles) {
             setPackageConfigFiles(initialCust.packageConfigFiles);
           }
+          const powerEnabled = initialCust.powerPlanSettings?.enabled !== false;
           setSystemConfig({
             enableRdp: initialCust.enableRdp,
             addAdGroupToAdmins: true,
             adAdminGroupName: initialCust.defaultAdAdminGroup,
-            setPowerPlan: true,
+            setPowerPlan: powerEnabled,
             screenTimeoutAc: initialCust.powerPlanSettings?.screenTimeoutAc ?? 15,
             standbyTimeoutAc: initialCust.powerPlanSettings?.standbyTimeoutAc ?? 0,
           });
@@ -331,6 +376,32 @@ export default function App() {
     setEnabledSwitchIds((prev) => prev.filter((sId) => sId !== id));
   };
 
+  const handleRunQuickDeployment = (config: {
+    machineName: string;
+    customer: CustomerProfile;
+    selectedPackages: SoftwarePackage[];
+    packageOverrides: Record<string, { extraSwitches?: string }>;
+    uncCredentials?: { username?: string; password?: string };
+  }) => {
+    setMachineName(config.machineName.startsWith('$') ? 'WS-CLIENT-01' : config.machineName);
+    setSelectedCustomerId(config.customer.id);
+    setSelectedPackageIds(config.selectedPackages.map((p) => p.id));
+    const customSwitches: Record<string, string> = {};
+    Object.entries(config.packageOverrides).forEach(([pkgId, ov]) => {
+      if (ov.extraSwitches) customSwitches[pkgId] = ov.extraSwitches;
+    });
+    setPackageCustomSwitches(customSwitches);
+    // Non-disruptive mode: omit power settings and admin group modifications
+    setSystemConfig((prev) => ({
+      ...prev,
+      setPowerPlan: false,
+      addAdGroupToAdmins: false,
+    }));
+    setEnabledSwitchIds([]);
+    setIsDeploying(true);
+    setActiveTab('runner');
+  };
+
   const handleViewCertificate = (record: DeploymentRecord) => {
     setActiveAuditRecord(record);
     setIsAuditModalOpen(true);
@@ -347,6 +418,9 @@ export default function App() {
         machineName={machineName}
         selectedCustomerName={activeCustomer.companyName}
         isDeploying={isDeploying}
+        currentUser={currentUser}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
+        onOpenLogin={() => setIsLoginModalOpen(true)}
       />
 
       {/* Main Content Body */}
@@ -386,6 +460,15 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'quick-deploy' && (
+          <QuickSoftwareDeploy
+            packages={packages}
+            customers={customers}
+            defaultDomain={appSettings.defaultGlobalDomain}
+            onRunQuickDeployment={handleRunQuickDeployment}
+          />
+        )}
+
         {activeTab === 'runner' && (
           <LiveRunner
             isDeploying={isDeploying}
@@ -411,6 +494,7 @@ export default function App() {
           <CustomerProfilesManager
             customers={customers}
             packages={packages}
+            defaultDomain={appSettings.defaultGlobalDomain}
             onAddCustomer={handleAddCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             onDeleteCustomer={handleDeleteCustomer}
@@ -478,6 +562,22 @@ export default function App() {
         onClose={() => setIsAuditModalOpen(false)}
         record={activeAuditRecord || deployments[0] || null}
         packages={packages}
+      />
+
+      {/* Infrastructure & Administration Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        onSettingsUpdated={(newSets) => setAppSettings(newSets)}
+      />
+
+      {/* Technician Login & AD Auth Modal */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        currentUser={currentUser}
+        appSettings={appSettings}
+        onUserChanged={(usr) => setCurrentUser(usr)}
       />
     </div>
   );

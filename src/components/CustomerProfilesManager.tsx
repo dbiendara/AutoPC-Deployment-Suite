@@ -34,6 +34,7 @@ import {
 interface CustomerProfilesManagerProps {
   customers: CustomerProfile[];
   packages: SoftwarePackage[];
+  defaultDomain?: string;
   onAddCustomer: (profile: CustomerProfile) => void;
   onUpdateCustomer: (profile: CustomerProfile) => void;
   onDeleteCustomer: (customerId: string) => void;
@@ -43,6 +44,7 @@ interface CustomerProfilesManagerProps {
 export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = ({
   customers,
   packages,
+  defaultDomain,
   onAddCustomer,
   onUpdateCustomer,
   onDeleteCustomer,
@@ -58,13 +60,11 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
   const [domainName, setDomainName] = useState('');
   const [defaultAdAdminGroup, setDefaultAdAdminGroup] = useState('');
   const [uncShareRoot, setUncShareRoot] = useState('');
+  const [configurePowerSettings, setConfigurePowerSettings] = useState(false);
   const [screenTimeoutAc, setScreenTimeoutAc] = useState(15);
   const [standbyTimeoutAc, setStandbyTimeoutAc] = useState(0);
   const [enableRdp, setEnableRdp] = useState(true);
   const [selectedPkgIds, setSelectedPkgIds] = useState<string[]>([]);
-  const [tvToken, setTvToken] = useState('');
-  const [tvConfigId, setTvConfigId] = useState('');
-  const [tvConfigFile, setTvConfigFile] = useState('');
   const [notes, setNotes] = useState('');
   const [pkgSearch, setPkgSearch] = useState('');
   const [pkgCategoryFilter, setPkgCategoryFilter] = useState('All');
@@ -88,21 +88,12 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
     setDomainName(cust.domainName);
     setDefaultAdAdminGroup(cust.defaultAdAdminGroup);
     setUncShareRoot(cust.uncShareRoot);
-    setScreenTimeoutAc(cust.powerPlanSettings.screenTimeoutAc);
-    setStandbyTimeoutAc(cust.powerPlanSettings.standbyTimeoutAc);
+    setConfigurePowerSettings(cust.powerPlanSettings?.enabled === true);
+    setScreenTimeoutAc(cust.powerPlanSettings?.screenTimeoutAc ?? 15);
+    setStandbyTimeoutAc(cust.powerPlanSettings?.standbyTimeoutAc ?? 0);
     setEnableRdp(cust.enableRdp);
     setSelectedPkgIds(cust.packageIds || []);
     setNotes(cust.notes || '');
-
-    // Extract TV extra switches
-    const tvSwitches = cust.packageCustomSwitches?.['pkg-teamviewer'] || '';
-    const configMatch = tvSwitches.match(/CUSTOMCONFIGID=([^\s]+)/);
-    const tokenMatch = tvSwitches.match(/APITOKEN=([^\s]+)/);
-    setTvConfigId(configMatch ? configMatch[1] : 'idc89120');
-    setTvToken(tokenMatch ? tokenMatch[1] : 'token-client-abc');
-
-    const tvConfig = cust.packageConfigFiles?.['pkg-teamviewer'] || `${cust.uncShareRoot}\\TeamViewer_Settings.tvopt`;
-    setTvConfigFile(tvConfig);
 
     // Network Drives and Printers
     setNetworkDrives(cust.networkDrives || []);
@@ -120,17 +111,14 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
     setEditingCustomer(null);
     setCompanyName('');
     setCustomerCode('');
-    setDomainName('client.corp');
-    setDefaultAdAdminGroup('CLIENT\\IT-Admins');
+    setDomainName(defaultDomain || 'corp.internal.net');
+    setDefaultAdAdminGroup('CORP\\IT-Admins');
     setUncShareRoot('\\\\corp-fs01.internal.net\\deployments\\customers\\newclient');
+    setConfigurePowerSettings(false);
     setScreenTimeoutAc(15);
     setStandbyTimeoutAc(0);
     setEnableRdp(true);
-    setSelectedPkgIds(['pkg-teamviewer', 'pkg-chrome', 'pkg-7zip', 'pkg-m365']);
-    const rnd = Math.floor(10000 + Math.random() * 90000);
-    setTvConfigId(`idc${rnd}`);
-    setTvToken(`token-${Math.floor(1000 + Math.random() * 9000)}`);
-    setTvConfigFile(`\\\\corp-fs01.internal.net\\deployments\\customers\\newclient\\TeamViewer_Settings.tvopt`);
+    setSelectedPkgIds(['pkg-chrome', 'pkg-7zip', 'pkg-m365']);
     setNotes('');
 
     // Default template drives & printers for new client
@@ -249,16 +237,6 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
   };
 
   const handleSave = () => {
-    const customSwitches: Record<string, string> = {};
-    const configFiles: Record<string, string> = {};
-
-    if (tvConfigId || tvToken) {
-      customSwitches['pkg-teamviewer'] = `CUSTOMCONFIGID=${tvConfigId} APITOKEN=${tvToken} ASSIGNMENTOPTIONS="--alias %COMPUTERNAME% --grant-easy-access"`;
-    }
-    if (tvConfigFile) {
-      configFiles['pkg-teamviewer'] = tvConfigFile;
-    }
-
     const payload: CustomerProfile = {
       id: editingCustomer ? editingCustomer.id : `cust-${Date.now().toString(36)}`,
       companyName,
@@ -268,12 +246,13 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
       uncShareRoot,
       enableRdp,
       powerPlanSettings: {
+        enabled: configurePowerSettings,
         screenTimeoutAc,
         standbyTimeoutAc,
       },
       packageIds: selectedPkgIds,
-      packageCustomSwitches: customSwitches,
-      packageConfigFiles: configFiles,
+      packageCustomSwitches: editingCustomer?.packageCustomSwitches || {},
+      packageConfigFiles: editingCustomer?.packageConfigFiles || {},
       networkDrives,
       printers,
       userLogonStaging: {
@@ -421,19 +400,38 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
             </div>
           </div>
 
-          {/* Power Plan & RDP settings */}
+          {/* Power Plan (Optional) & RDP settings */}
           <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-            <h4 className="text-xs font-bold text-white flex items-center space-x-2">
-              <Sliders className="w-4 h-4 text-purple-400" />
-              <span>Workstation System Configuration Policies</span>
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-white flex items-center space-x-2">
+                <Sliders className="w-4 h-4 text-purple-400" />
+                <span>Workstation System Configuration Policies</span>
+              </h4>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="enable-power-policy-toggle"
+                  checked={configurePowerSettings}
+                  onChange={(e) => setConfigurePowerSettings(e.target.checked)}
+                  className="rounded border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 cursor-pointer"
+                />
+                <label htmlFor="enable-power-policy-toggle" className="text-xs text-slate-300 cursor-pointer font-medium select-none">
+                  Customize Power Plan (Optional)
+                </label>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <div>
-                <label className="block text-slate-300 font-medium mb-1.5">Screen Timeout (AC Power)</label>
+                <label className="block text-slate-300 font-medium mb-1.5">
+                  Screen Timeout (AC Power)
+                  {!configurePowerSettings && <span className="text-[10px] text-slate-500 ml-1.5">(Disabled)</span>}
+                </label>
                 <select
+                  disabled={!configurePowerSettings}
                   value={screenTimeoutAc}
                   onChange={(e) => setScreenTimeoutAc(parseInt(e.target.value, 10))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <option value={10}>10 Minutes</option>
                   <option value={15}>15 Minutes</option>
@@ -444,11 +442,15 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
               </div>
 
               <div>
-                <label className="block text-slate-300 font-medium mb-1.5">Standby Timeout (AC Power)</label>
+                <label className="block text-slate-300 font-medium mb-1.5">
+                  Standby Timeout (AC Power)
+                  {!configurePowerSettings && <span className="text-[10px] text-slate-500 ml-1.5">(Disabled)</span>}
+                </label>
                 <select
+                  disabled={!configurePowerSettings}
                   value={standbyTimeoutAc}
                   onChange={(e) => setStandbyTimeoutAc(parseInt(e.target.value, 10))}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <option value={0}>Never Sleep (0)</option>
                   <option value={30}>30 Minutes</option>
@@ -473,48 +475,12 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Customer TeamViewer Host Settings */}
-          <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-            <h4 className="text-xs font-bold text-white flex items-center space-x-2">
-              <Settings className="w-4 h-4 text-cyan-400" />
-              <span>TeamViewer Host Deployment Parameters (Customer Specific)</span>
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">TeamViewer CustomConfigID:</label>
-                <input
-                  type="text"
-                  value={tvConfigId}
-                  onChange={(e) => setTvConfigId(e.target.value)}
-                  placeholder="e.g. idc89120"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-emerald-300 font-mono focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">TeamViewer API Assignment Token:</label>
-                <input
-                  type="text"
-                  value={tvToken}
-                  onChange={(e) => setTvToken(e.target.value)}
-                  placeholder="e.g. 109283-acmetoken"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-emerald-300 font-mono focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-400 mb-1 font-mono">Settings File (.tvopt) UNC Path:</label>
-                <input
-                  type="text"
-                  value={tvConfigFile}
-                  onChange={(e) => setTvConfigFile(e.target.value)}
-                  placeholder="\\path\to\TeamViewer_Settings.tvopt"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-cyan-300 font-mono focus:outline-none focus:border-cyan-500"
-                />
-              </div>
-            </div>
+            {!configurePowerSettings && (
+              <p className="text-[11px] text-slate-500 italic pt-1">
+                Note: Power plan modification is omitted. Workstations will retain their existing Windows power settings.
+              </p>
+            )}
           </div>
 
           {/* NETWORK DRIVES & PRINTER MAPPING (USER FIRST-LOGON STAGING) */}
@@ -939,7 +905,11 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Power Plan:</span>
-                    <span>Screen {cust.powerPlanSettings.screenTimeoutAc}m • Standby {cust.powerPlanSettings.standbyTimeoutAc === 0 ? 'Never' : `${cust.powerPlanSettings.standbyTimeoutAc}m`}</span>
+                    {cust.powerPlanSettings?.enabled ? (
+                      <span>Screen {cust.powerPlanSettings.screenTimeoutAc}m • Standby {cust.powerPlanSettings.standbyTimeoutAc === 0 ? 'Never' : `${cust.powerPlanSettings.standbyTimeoutAc}m`}</span>
+                    ) : (
+                      <span className="text-slate-500 italic">Workstation default (Unchanged)</span>
+                    )}
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">RDP Enabled:</span>

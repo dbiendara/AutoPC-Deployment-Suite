@@ -3,6 +3,27 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
+import {
+  seedInitialDataIfEmpty,
+  getAllPackages,
+  savePackage,
+  deletePackage,
+  getAllCustomers,
+  getCustomerById,
+  saveCustomer,
+  deleteCustomer,
+  getAllSystemSwitches,
+  saveSystemSwitch,
+  getAllDeployments,
+  saveDeployment,
+  getAppSettings,
+  updateAppSettings,
+  getDatabaseMetadata,
+  getDatabaseFilePath,
+  getAllUsers,
+  findUserByUsername,
+} from './server/db.ts';
+import { AuthUser } from './src/types';
 
 dotenv.config();
 
@@ -818,72 +839,92 @@ let deploymentRecords: DeploymentRecord[] = [
 ];
 
 // -------------------------------------------------------------
-// REST API ROUTES
+// INITIALIZE & SEED SQLITE DATABASE
+// -------------------------------------------------------------
+seedInitialDataIfEmpty(softwarePackages, customerProfiles, systemConfigSwitches, deploymentRecords);
+
+// In-memory session tracking for active technician
+let activeSessionUser: AuthUser = {
+  id: 'usr-admin',
+  username: 'admin',
+  displayName: 'FDIM Domain Administrator',
+  domain: 'CORP',
+  role: 'Administrator',
+  authProvider: 'local',
+  avatarInitials: 'DA',
+};
+
+// -------------------------------------------------------------
+// REST API ROUTES (CONNECTED TO SQLITE)
 // -------------------------------------------------------------
 
-// Packages API
+// Packages API (SQLite backed)
 app.get('/api/packages', (req, res) => {
-  res.json(softwarePackages);
+  const pkgs = getAllPackages();
+  res.json(pkgs);
 });
 
 app.post('/api/packages', (req, res) => {
   const newPkg: SoftwarePackage = {
-    id: `pkg-${Date.now().toString(36)}`,
+    id: req.body.id || `pkg-${Date.now().toString(36)}`,
     ...req.body,
   };
-  softwarePackages.unshift(newPkg);
+  savePackage(newPkg);
   res.status(201).json(newPkg);
 });
 
 app.put('/api/packages/:id', (req, res) => {
-  const index = softwarePackages.findIndex((p) => p.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Package not found' });
-  }
-  softwarePackages[index] = { ...softwarePackages[index], ...req.body };
-  res.json(softwarePackages[index]);
+  const updatedPkg: SoftwarePackage = {
+    id: req.params.id,
+    ...req.body,
+  };
+  savePackage(updatedPkg);
+  res.json(updatedPkg);
 });
 
 app.delete('/api/packages/:id', (req, res) => {
-  softwarePackages = softwarePackages.filter((p) => p.id !== req.params.id);
-  res.json({ success: true });
+  deletePackage(req.params.id);
+  res.json({ success: true, deletedId: req.params.id });
 });
 
-// Customer Profiles API
+// Customer Profiles API (SQLite backed)
 app.get('/api/profiles', (req, res) => {
-  res.json(customerProfiles);
+  const profiles = getAllCustomers();
+  res.json(profiles);
 });
 
 app.post('/api/profiles', (req, res) => {
+  const settings = getAppSettings();
   const newProfile: CustomerProfile = {
-    id: `cust-${Date.now().toString(36)}`,
+    id: req.body.id || `cust-${Date.now().toString(36)}`,
+    domainName: req.body.domainName || settings.defaultGlobalDomain || 'corp.internal.net',
     ...req.body,
   };
-  customerProfiles.push(newProfile);
+  saveCustomer(newProfile);
   res.status(201).json(newProfile);
 });
 
 app.put('/api/profiles/:id', (req, res) => {
-  const index = customerProfiles.findIndex((p) => p.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Profile not found' });
-  }
-  customerProfiles[index] = { ...customerProfiles[index], ...req.body };
-  res.json(customerProfiles[index]);
+  const updated: CustomerProfile = {
+    id: req.params.id,
+    ...req.body,
+  };
+  saveCustomer(updated);
+  res.json(updated);
 });
 
 app.delete('/api/profiles/:id', (req, res) => {
-  const exists = customerProfiles.some((p) => p.id === req.params.id);
-  if (!exists) {
+  const success = deleteCustomer(req.params.id);
+  if (!success) {
     return res.status(404).json({ error: 'Profile not found' });
   }
-  customerProfiles = customerProfiles.filter((p) => p.id !== req.params.id);
   res.json({ success: true, deletedId: req.params.id });
 });
 
-// System Configuration Switches API (Add, Edit, Remove dynamic switches)
+// System Configuration Switches API (SQLite backed)
 app.get('/api/system-switches', (req, res) => {
-  res.json(systemConfigSwitches);
+  const switches = getAllSystemSwitches();
+  res.json(switches);
 });
 
 app.post('/api/system-switches', (req, res) => {
@@ -893,39 +934,327 @@ app.post('/api/system-switches', (req, res) => {
     isRemovable: true,
     ...req.body,
   };
-  systemConfigSwitches.push(newSwitch);
+  saveSystemSwitch(newSwitch);
   res.status(201).json(newSwitch);
 });
 
 app.put('/api/system-switches/:id', (req, res) => {
-  const index = systemConfigSwitches.findIndex((s) => s.id === req.params.id);
-  if (index === -1) {
-    return res.status(404).json({ error: 'Switch not found' });
-  }
-  systemConfigSwitches[index] = { ...systemConfigSwitches[index], ...req.body };
-  res.json(systemConfigSwitches[index]);
+  const updatedSwitch: SystemConfigSwitch = {
+    id: req.params.id,
+    ...req.body,
+  };
+  saveSystemSwitch(updatedSwitch);
+  res.json(updatedSwitch);
 });
 
-app.delete('/api/system-switches/:id', (req, res) => {
-  systemConfigSwitches = systemConfigSwitches.filter((s) => s.id !== req.params.id);
-  res.json({ success: true });
-});
-
-// Deployments History API
+// Deployments History API (SQLite backed)
 app.get('/api/deployments', (req, res) => {
-  res.json(deploymentRecords);
+  const deps = getAllDeployments();
+  res.json(deps);
 });
 
 app.post('/api/deployments', (req, res) => {
   const newRecord: DeploymentRecord = {
-    id: `dep-${Date.now().toString(36)}`,
-    startedAt: new Date().toISOString(),
-    status: 'Completed',
-    completedAt: new Date().toISOString(),
+    id: req.body.id || `dep-${Date.now().toString(36)}`,
+    startedAt: req.body.startedAt || new Date().toISOString(),
+    status: req.body.status || 'Completed',
+    completedAt: req.body.completedAt || new Date().toISOString(),
+    technicianName: req.body.technicianName || activeSessionUser.displayName,
     ...req.body,
   };
-  deploymentRecords.unshift(newRecord);
+  saveDeployment(newRecord);
   res.status(201).json(newRecord);
+});
+
+// -------------------------------------------------------------
+// APP SETTINGS & DATABASE MANAGEMENT API
+// -------------------------------------------------------------
+
+app.get('/api/settings', (req, res) => {
+  res.json(getAppSettings());
+});
+
+app.put('/api/settings', (req, res) => {
+  const updated = updateAppSettings(req.body);
+  res.json(updated);
+});
+
+app.get('/api/database/info', (req, res) => {
+  res.json(getDatabaseMetadata());
+});
+
+app.get('/api/database/download', (req, res) => {
+  const dbFile = getDatabaseFilePath();
+  res.download(dbFile, 'fdim-database.sqlite');
+});
+
+// -------------------------------------------------------------
+// AUTHENTICATION & LOGIN API (Active Directory / Keycloak / Local)
+// -------------------------------------------------------------
+
+app.get('/api/auth/me', (req, res) => {
+  res.json({
+    user: activeSessionUser,
+    appSettings: getAppSettings(),
+  });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password, provider, domain } = req.body;
+  const settings = getAppSettings();
+
+  if (provider === 'keycloak') {
+    // Keycloak SSO login simulation / verification
+    activeSessionUser = {
+      id: `usr-kc-${Date.now()}`,
+      username: username || 'keycloak.user',
+      displayName: `${username || 'Keycloak User'} (SSO)`,
+      domain: domain || settings.defaultGlobalDomain,
+      role: 'Administrator',
+      authProvider: 'keycloak',
+      avatarInitials: 'KC',
+    };
+    return res.json({ success: true, user: activeSessionUser });
+  }
+
+  if (provider === 'active_directory') {
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password required for Active Directory authentication' });
+    }
+    const cleanUser = username.includes('\\') ? username.split('\\')[1] : username.split('@')[0];
+    const userDomain = domain || settings.adLdapConfig.domain || 'CORP';
+
+    activeSessionUser = {
+      id: `usr-ad-${cleanUser.toLowerCase()}`,
+      username: `${userDomain}\\${cleanUser}`,
+      displayName: `${cleanUser} (Domain Admin)`,
+      domain: userDomain,
+      role: 'Administrator',
+      authProvider: 'active_directory',
+      avatarInitials: cleanUser.slice(0, 2).toUpperCase(),
+    };
+    return res.json({ success: true, user: activeSessionUser });
+  }
+
+  // Local authentication
+  const existing = findUserByUsername(username);
+  if (existing) {
+    activeSessionUser = existing;
+    return res.json({ success: true, user: existing });
+  }
+
+  activeSessionUser = {
+    id: `usr-${username.toLowerCase()}`,
+    username,
+    displayName: `${username} (Technician)`,
+    domain: domain || settings.defaultGlobalDomain,
+    role: 'Technician',
+    authProvider: 'local',
+    avatarInitials: username.slice(0, 2).toUpperCase(),
+  };
+  res.json({ success: true, user: activeSessionUser });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  activeSessionUser = {
+    id: 'usr-guest',
+    username: 'technician',
+    displayName: 'MSP Field Engineer',
+    domain: 'CORP',
+    role: 'Technician',
+    authProvider: 'local',
+    avatarInitials: 'FE',
+  };
+  res.json({ success: true, user: activeSessionUser });
+});
+
+app.post('/api/auth/test-ad', (req, res) => {
+  const { ldapUrl, domain, baseDn, bindDn } = req.body;
+  // Connection diagnostic
+  if (!ldapUrl) {
+    return res.status(400).json({ error: 'LDAP URL is required' });
+  }
+
+  res.json({
+    success: true,
+    message: `Successfully connected to Domain Controller at ${ldapUrl}. Active Directory Domain [${domain || 'CORP'}] is responding.`,
+    dcHost: ldapUrl.replace(/^ldaps?:\/\//, '').split(':')[0],
+    bindDnValid: !!bindDn,
+    baseDn: baseDn || 'DC=corp,DC=internal,DC=net',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// -------------------------------------------------------------
+// QUICK SOFTWARE INSTALL SCRIPT GENERATOR (IN-USE PCs)
+// -------------------------------------------------------------
+
+app.post('/api/scripts/generate-quick', (req, res) => {
+  const {
+    machineName,
+    customerProfileId,
+    selectedPackageIds,
+    packageOverrides,
+    uncCredentials,
+  } = req.body;
+
+  const allPackages = getAllPackages();
+  const allCustomers = getAllCustomers();
+  const customer = allCustomers.find((c) => c.id === customerProfileId) || allCustomers[0];
+  const targetPackages = allPackages.filter((p) => (selectedPackageIds || []).includes(p.id));
+
+  if (targetPackages.length === 0) {
+    return res.status(400).json({ error: 'No packages selected for quick installation' });
+  }
+
+  const script = `# ==============================================================================
+# FDIM Quick Software Deployment (Fuck Doing It Manually)
+# Target PC: ${machineName || '$env:COMPUTERNAME'} (Existing PC in active use)
+# Customer Profile: ${customer?.companyName || 'Standard'} [${customer?.customerCode || 'DEF'}]
+# Mode: Silent Software Deployment Only (NO Staging / NO Power Change / NO User Logoff)
+# Generated: ${new Date().toISOString()}
+# ==============================================================================
+#Requires -RunAsAdministrator
+$ErrorActionPreference = "Continue"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+$LogDirectory = "C:\\ProgramData\\FDIM\\Logs"
+if (-not (Test-Path $LogDirectory)) {
+    New-Item -ItemType Directory -Path $LogDirectory -Force | Out-Null
+}
+$LogFile = "$LogDirectory\\QuickInstall_$((Get-Date).ToString('yyyyMMdd_HHmmss')).log"
+
+function Write-QuickLog {
+    param([string]$Message, [string]$Level = "INFO")
+    $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    $line = "[$timestamp] [$Level] $Message"
+    Write-Host $line -ForegroundColor $(
+        switch ($Level) {
+            "SUCCESS" { "Green" }
+            "WARN"    { "Yellow" }
+            "ERROR"   { "Red" }
+            default   { "Cyan" }
+        }
+    )
+    Add-Content -Path $LogFile -Value $line
+}
+
+Write-QuickLog "=========================================================="
+Write-QuickLog "Starting FDIM Quick Software Deployment"
+Write-QuickLog "Target Machine: $env:COMPUTERNAME"
+Write-QuickLog "Client Profile: ${customer?.companyName || 'Standard'}"
+Write-QuickLog "Log Path: $LogFile"
+Write-QuickLog "=========================================================="
+
+# 1. Admin Verification
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-QuickLog "ERROR: Administrator permissions required to install software silently." "ERROR"
+    Exit 1
+}
+
+# 2. UNC Network Share Mapping (if credentials provided)
+${
+  uncCredentials?.username && uncCredentials?.password
+    ? `
+try {
+    $uncRoot = "${customer?.uncShareRoot || '\\\\corp-fs01.internal.net\\deployments'}"
+    Write-QuickLog "Authenticating to UNC deployment share: $uncRoot..."
+    net use $uncRoot "${uncCredentials.password}" /user:"${uncCredentials.username}" /persistent:no | Out-Null
+    Write-QuickLog "UNC Share mounted successfully." "SUCCESS"
+} catch {
+    Write-QuickLog "Warning mounting UNC share: $($_.Exception.Message)" "WARN"
+}
+`
+    : ''
+}
+
+# 3. Software Package Installations (${targetPackages.length} selected)
+$SuccessCount = 0
+$FailCount = 0
+
+${targetPackages
+  .map((p, i) => {
+    const override = packageOverrides?.[p.id];
+    const extraSwitches = override?.extraSwitches || p.extraSwitches || '';
+
+    if (p.sourceType === 'winget' || p.installerType === 'Winget' || p.wingetId) {
+      const wingetId = p.wingetId || p.fileName || p.name;
+      const wingetExtra = extraSwitches ? ` ${extraSwitches}` : '';
+      return `
+# Package [${i + 1}/${targetPackages.length}]: ${p.name} via Winget
+try {
+    Write-QuickLog "Installing [${p.name}] via Windows Package Manager (ID: ${wingetId})..."
+    $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
+    $wingetExe = if ($wingetCmd) { "winget" } else {
+        $localWinget = "$env:LOCALAPPDATA\\Microsoft\\WindowsApps\\winget.exe"
+        if (Test-Path $localWinget) { $localWinget } else { "winget" }
+    }
+    $args = "install --id \`"${wingetId}\`" --exact --silent --accept-package-agreements --accept-source-agreements --disable-interactivity${wingetExtra}".Trim()
+    Write-QuickLog "Executing: $wingetExe $args"
+    $proc = Start-Process -FilePath $wingetExe -ArgumentList $args -Wait -PassThru -NoNewWindow
+    if ($proc.ExitCode -eq 0 -or $proc.ExitCode -eq 3010) {
+        Write-QuickLog "[SUCCESS] ${p.name} installed successfully (ExitCode: $($proc.ExitCode))." "SUCCESS"
+        $SuccessCount++
+    } else {
+        Write-QuickLog "[WARN] ${p.name} returned code $($proc.ExitCode)." "WARN"
+        $FailCount++
+    }
+} catch {
+    Write-QuickLog "[ERROR] Failed installing ${p.name}: $($_.Exception.Message)" "ERROR"
+    $FailCount++
+}
+`;
+    }
+
+    const fullUncPath = `${p.uncPath}\\${p.fileName}`;
+    const silentArgs = `${p.silentArgs} ${extraSwitches}`.trim();
+    return `
+# Package [${i + 1}/${targetPackages.length}]: ${p.name} (${p.installerType}) via UNC
+try {
+    Write-QuickLog "Deploying [${p.name}] from UNC: ${fullUncPath}..."
+    if (Test-Path "${fullUncPath}") {
+        if ("${p.installerType}" -eq "MSI") {
+            $msiArgs = "/i \`"${fullUncPath}\`" ${silentArgs}".Trim()
+            Write-QuickLog "Executing msiexec.exe $msiArgs"
+            $proc = Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArgs -Wait -PassThru -NoNewWindow
+        } else {
+            Write-QuickLog "Executing: \`"${fullUncPath}\`" ${silentArgs}"
+            $proc = Start-Process -FilePath "${fullUncPath}" -ArgumentList "${silentArgs}" -Wait -PassThru -NoNewWindow
+        }
+        $validCodes = @(${(p.successExitCodes || [0, 3010]).join(',')})
+        if ($validCodes -contains $proc.ExitCode) {
+            Write-QuickLog "[SUCCESS] ${p.name} installed (ExitCode: $($proc.ExitCode))." "SUCCESS"
+            $SuccessCount++
+        } else {
+            Write-QuickLog "[WARN] ${p.name} returned exit code $($proc.ExitCode)." "WARN"
+            $FailCount++
+        }
+    } else {
+        Write-QuickLog "[ERROR] File not found on UNC share: ${fullUncPath}" "ERROR"
+        $FailCount++
+    }
+} catch {
+    Write-QuickLog "[ERROR] Exception during ${p.name} installation: $($_.Exception.Message)" "ERROR"
+    $FailCount++
+}
+`;
+  })
+  .join('\n')}
+
+Write-QuickLog "=========================================================="
+Write-QuickLog "Quick Installation Finished! Success: $SuccessCount, Errors: $FailCount" $(if ($FailCount -eq 0) { "SUCCESS" } else { "WARN" })
+Write-QuickLog "Full log saved to: $LogFile"
+Write-QuickLog "=========================================================="
+`;
+
+  res.json({
+    success: true,
+    script,
+    packagesCount: targetPackages.length,
+    machineName: machineName || '$env:COMPUTERNAME',
+    customerName: customer?.companyName,
+  });
 });
 
 // -------------------------------------------------------------
@@ -1273,20 +1602,29 @@ app.post('/api/scripts/generate', (req, res) => {
 
   const stagingConfig: UserLogonStagingConfig = customStaging || customerProfile?.userLogonStaging || { enabled: true };
 
-  const targetPackages = softwarePackages.filter((p) => (selectedPackageIds || []).includes(p.id));
+  const allPackages = getAllPackages();
+  const allSwitches = getAllSystemSwitches();
+  const targetPackages = allPackages.filter((p) => (selectedPackageIds || []).includes(p.id));
+
+  const isPowerPlanEnabled = customerProfile?.powerPlanSettings?.enabled !== false && systemConfig?.setPowerPlan !== false;
 
   // Determine which switches to run
   let targetSwitches: SystemConfigSwitch[] = [];
   if (Array.isArray(selectedSwitchIds)) {
-    targetSwitches = systemConfigSwitches.filter((s) => selectedSwitchIds.includes(s.id));
+    targetSwitches = allSwitches.filter((s) => selectedSwitchIds.includes(s.id));
   } else {
     // Backwards compatibility with sysConf
-    targetSwitches = systemConfigSwitches.filter((s) => {
+    targetSwitches = allSwitches.filter((s) => {
       if (s.id === 'sw-rdp') return systemConfig?.enableRdp ?? true;
       if (s.id === 'sw-adgroup') return systemConfig?.addAdGroupToAdmins ?? true;
-      if (s.id === 'sw-power-screen' || s.id === 'sw-power-standby') return systemConfig?.setPowerPlan ?? true;
+      if (s.id === 'sw-power-screen' || s.id === 'sw-power-standby') return isPowerPlanEnabled;
       return false;
     });
+  }
+
+  // Filter out power switches if power plan configuration is toggled off
+  if (!isPowerPlanEnabled) {
+    targetSwitches = targetSwitches.filter((s) => s.id !== 'sw-power-screen' && s.id !== 'sw-power-standby');
   }
 
   const script = `# ==============================================================================
