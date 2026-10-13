@@ -126,6 +126,7 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 
 - **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS v4](https://tailwindcss.com/), [Lucide React](https://lucide.dev/), [Motion](https://motion.dev/), Browser `localStorage` Draft Engine
 - **Backend**: [Express 4](https://expressjs.com/), [Node.js](https://nodejs.org/) (v22+), [tsx](https://github.com/privatenumber/tsx), built-in `node:sqlite` database
+- **Containerization & Hosting**: Docker multi-stage build (`node:22-alpine`), Docker Compose, Nginx reverse proxy with SSL/TLS termination & unbuffered terminal streaming
 - **AI Engine**: `@google/genai` (Google Gemini 2.5) for silent argument detection & hanging installer risk analysis
 - **Deployment Script Target**: Microsoft Windows 10/11 Pro & Enterprise, Windows Server, PowerShell 5.1 & PowerShell 7+
 
@@ -134,6 +135,13 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 ## 📁 Repository Structure
 
 ```
+├── Dockerfile                            # Multi-stage production container build (Node 22 + persistent /app/data)
+├── docker-compose.yml                    # Multi-container stack (FDIM App + Nginx reverse proxy with SSL termination)
+├── docker/
+│   ├── generate-ssl.sh                   # Automated self-signed SSL/TLS certificate generator for intranet/local IP
+│   └── nginx/
+│       ├── nginx.conf                    # Nginx reverse proxy, HTTPS 443, WebSocket terminal streaming, security headers
+│       └── ssl/                          # Mounted SSL certificates directory
 ├── server.ts                             # Express backend, SQLite tables & PowerShell script synthesizer
 ├── src/
 │   ├── main.tsx                          # React client entry point
@@ -165,14 +173,113 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 
 ---
 
-## 🛠️ Getting Started
+## 🐳 Production Server Deployment (Docker & Compose — Recommended)
+
+The recommended enterprise deployment route for the AutoPC Deploy & Admin Suite server is **Docker with Docker Compose**. Running via Docker encapsulates all Node.js and TypeScript runtime dependencies, provides an integrated Nginx reverse proxy with SSL/TLS termination, configures real-time streaming for live deployment terminals, and binds persistent SQLite data to the host.
+
+### Why Docker is the Recommended Deployment Route
+- **Zero Host Toolchain Dependency**: No requirement to install or manage Node.js, npm, or tsx on your production host, intranet server, or IT management VM.
+- **Multi-Stage Production Build**: Compiles the React/Vite frontend into optimized static assets and runs a streamlined production Alpine image (`node:22-alpine`).
+- **Nginx Reverse Proxy & SSL Termination**: Automated HTTP-to-HTTPS redirection (port 80 → 443), modern TLS ciphers (TLSv1.2 & TLSv1.3), and hardened security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`).
+- **Real-Time Terminal Streaming (Live Runner)**: Pre-configured `proxy_buffering off;` and WebSocket/SSE headers allow the interactive live deployment terminal and logging pipes to stream to the browser without proxy buffering lag.
+- **Persistent Storage Across Updates**: The SQLite database (`node:sqlite`) is located in `/app/data` and mounted to the host's `./data` directory, preserving all customer profiles, software packages, custom switches, and deployment history across container rebuilds.
+- **50MB Package Upload Support**: `client_max_body_size 50M;` allows seamless importing of custom installer configuration files (e.g., TeamViewer `.tvopt`).
+
+### 🚀 Rapid 3-Step Docker Compose Deployment
+
+#### Step 1: Generate or Provide SSL Certificates
+The included Nginx reverse proxy serves the app over secure HTTPS. For intranet, homelab, or testing environments, generate a 2048-bit RSA self-signed certificate with one command:
+```bash
+chmod +x docker/generate-ssl.sh
+./docker/generate-ssl.sh
+```
+*Note: For production enterprise environments with a public domain or internal Active Directory Certificate Services (AD CS), place your valid `cert.pem` and `key.pem` directly into `./docker/nginx/ssl/`.*
+
+#### Step 2: Configure Environment Variables
+Copy the sample environment file:
+```bash
+cp .env.example .env
+```
+Edit `.env` to configure your settings:
+```env
+PORT=3000
+NODE_ENV=production
+
+# Optional: Google Gemini API key for AI-assisted silent installer switch discovery
+GEMINI_API_KEY=your_google_gemini_api_key_here
+```
+
+#### Step 3: Launch Containers
+Build and start the multi-container stack in the background:
+```bash
+docker compose up -d --build
+```
+
+#### Step 4: Access the Suite
+- **Secure Web UI**: Navigate to `https://<server-ip-or-hostname>` (or `https://localhost`).
+- **Automatic HTTP Redirection**: Requests on port `80` are automatically redirected to `443`.
+- **Direct Backend Port**: `http://<server-ip-or-hostname>:3000` (direct access without Nginx reverse proxy).
+
+---
+
+### 📦 Standalone Container Run (Without Compose / Nginx)
+If you operate an existing external reverse proxy (Traefik, Caddy, HAProxy, Cloudflare Tunnel, or IIS) or want a single container:
+
+```bash
+# 1. Build the production image
+docker build -t autopc-deploy:latest .
+
+# 2. Run with host data volume binding
+docker run -d \
+  --name autopc-suite \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -v $(pwd)/data:/app/data \
+  --env-file .env \
+  autopc-deploy:latest
+```
+
+---
+
+### 🔧 Docker Management & Maintenance
+- **View Container Logs in Real Time**:
+  ```bash
+  docker compose logs -f
+  # Or inspect individual services:
+  docker compose logs -f fdim
+  docker compose logs -f nginx
+  ```
+- **Update to the Latest Suite Version**:
+  ```bash
+  git pull
+  docker compose up -d --build
+  ```
+- **Backup Customer & Deployment Data**:
+  All application state is kept in the host `./data` directory. Back it up anytime without stopping containers:
+  ```bash
+  tar -czvf autopc-backup-$(date +%F).tar.gz ./data
+  ```
+- **Restart the Stack**:
+  ```bash
+  docker compose restart
+  ```
+- **Stop Containers**:
+  ```bash
+  docker compose down
+  ```
+
+---
+
+## 💻 Alternative: Local Node.js Development Setup
+
+For local contributors developing features or testing frontend changes without Docker:
 
 ### Prerequisites
-- **Node.js**: v18.0.0 or higher
+- **Node.js**: v20.0.0 or higher (v22+ recommended)
 - **npm**: v9.0.0 or higher
 - **Target Workstation (for scripts)**: Windows 10/11 (Domain-joined, Administrator privileges)
 
-### Installation
+### Local Setup Steps
 
 1. **Clone the repository**:
    ```bash
@@ -186,10 +293,10 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
    ```
 
 3. **Configure Environment Variables (Optional)**:
-   Create a `.env` file in the project root if you wish to enable AI-powered switch detection:
+   Create a `.env` file in the project root:
    ```env
-   GEMINI_API_KEY=your_google_gemini_api_key
    PORT=3000
+   GEMINI_API_KEY=your_google_gemini_api_key
    ```
 
 4. **Start the Development Server**:
@@ -198,7 +305,7 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
    ```
    Open your browser at `http://localhost:3000`.
 
-5. **Build for Production**:
+5. **Build & Run Production Mode Directly**:
    ```bash
    npm run build
    npm run start
@@ -206,7 +313,7 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 
 ---
 
-## 📖 Deployment Workflow
+## 📖 Workstation Provisioning Workflow (Zero-Touch Client Deployment)
 
 ### 1. Configure & Manage Customer Profiles
 Navigate to the **Customer Profiles** tab:
