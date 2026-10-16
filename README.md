@@ -1,10 +1,10 @@
-# AutoPC Deploy & Admin Suite 🖥️⚡
+# FDIM — Fuck Doing It Manually 🖥️⚡
 
 > **Enterprise Workstation Provisioning & Silent Software Deployment Platform for Active Directory Environments**
 
-AutoPC Deploy & Admin Suite is an automated deployment and administrative configuration tool built for IT Systems Administrators, MSPs (Managed Service Providers), and Helpdesk teams. It streamlines the onboarding of Windows client workstations that are already joined to a local or hybrid **Active Directory** domain with pre-configured hostnames.
+**FDIM** (**Fuck Doing It Manually**) is an automated deployment and administrative configuration platform built for IT Systems Administrators, MSPs (Managed Service Providers), and Helpdesk teams. It streamlines the onboarding of Windows client workstations that are already joined to a local or hybrid **Active Directory** domain with pre-configured hostnames.
 
-With AutoPC Deploy, technicians can select or customize client profiles, enforce critical enterprise system configurations (RDP, delegated AD admin groups, power schemes), select silent software packages from UNC network shares with tailored installer switches (including config file imports like TeamViewer Host `.tvopt`), and either generate production-grade, self-logging PowerShell deployment scripts or execute them via an interactive live runner.
+With FDIM, technicians can select or customize client profiles, enforce critical enterprise system configurations (RDP, delegated AD admin groups, power schemes), select silent software packages from UNC network shares with tailored installer switches (including config file imports like TeamViewer Host `.tvopt`), and either generate production-grade, self-logging PowerShell deployment scripts or execute them via an interactive live runner.
 
 ---
 
@@ -76,14 +76,14 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
   - Require elevation (`#Requires -RunAsAdministrator`).
   - Verify Active Directory domain reachability prior to execution.
   - Test UNC path availability before downloading or running installers.
-  - Maintain an execution transcript log in `C:\ProgramData\AutoPC-Deploy\Logs\`.
+  - Maintain an execution transcript log in `C:\ProgramData\FDIM\Logs\`.
   - Report exact return exit codes with graceful rollback warnings.
 
 ### 🖧 User First-Logon Staging (Network Drives & Printers via Active Setup)
 - **Solves Non-Logged-In User Limitation**: Workstation provisioning runs as Administrator or SYSTEM before the employee ever logs in. Network drive mappings (`HKCU:\Network`) and per-user network printers require the user's interactive Kerberos security token.
 - **Enterprise Dual-Engine Solution**:
   1. **Per-Machine Network Printers**: Configured machine-wide during provisioning using `rundll32 printui.dll,PrintUIEntry /ga /n"\\printserver\printer"`, making them immediately available to every present and future user on the PC.
-  2. **Active Setup First-Logon Staging**: AutoPC generates a self-contained payload at `C:\ProgramData\AutoPC\UserLogonSetup.ps1` and registers it in `HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\AutoPC_UserProvisioning` (with a secondary Scheduled Task trigger at logon). When any user signs in for the first time, the Windows Shell silently executes the script in their user context, mapping persistent drives (`net use S: "\\server\share" /persistent:yes` with dynamic `%USERNAME%` resolution) and assigning printers!
+  2. **Active Setup First-Logon Staging**: FDIM generates a self-contained payload at `C:\ProgramData\FDIM\UserLogonSetup.ps1` and registers it in `HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\FDIM_UserProvisioning` (with a secondary Scheduled Task trigger at logon). When any user signs in for the first time, the Windows Shell silently executes the script in their user context, mapping persistent drives (`net use S: "\\server\share" /persistent:yes` with dynamic `%USERNAME%` resolution) and assigning printers!
 
 ### ⏱️ Interactive Live Runner & Audit Certificates
 - **Step-by-Step Execution Console**: Real-time simulated or live execution terminal with timer tracking, status chips, and step-level rerun capabilities.
@@ -175,7 +175,7 @@ With AutoPC Deploy, technicians can select or customize client profiles, enforce
 
 ## 🐳 Production Server Deployment (Docker & Compose — Recommended)
 
-The recommended enterprise deployment route for the AutoPC Deploy & Admin Suite server is **Docker with Docker Compose**. Running via Docker encapsulates all Node.js and TypeScript runtime dependencies, provides an integrated Nginx reverse proxy with SSL/TLS termination, configures real-time streaming for live deployment terminals, and binds persistent SQLite data to the host.
+The recommended enterprise deployment route for the **FDIM** server is **Docker with Docker Compose**. Running via Docker encapsulates all Node.js and TypeScript runtime dependencies, provides an integrated Nginx reverse proxy with SSL/TLS termination, configures real-time streaming for live deployment terminals, and binds persistent SQLite data to the host.
 
 ### Why Docker is the Recommended Deployment Route
 - **Zero Host Toolchain Dependency**: No requirement to install or manage Node.js, npm, or tsx on your production host, intranet server, or IT management VM.
@@ -227,16 +227,16 @@ If you operate an existing external reverse proxy (Traefik, Caddy, HAProxy, Clou
 
 ```bash
 # 1. Build the production image
-docker build -t autopc-deploy:latest .
+docker build -t fdim-deploy:latest .
 
 # 2. Run with host data volume binding
 docker run -d \
-  --name autopc-suite \
+  --name fdim-suite \
   --restart unless-stopped \
   -p 3000:3000 \
   -v $(pwd)/data:/app/data \
   --env-file .env \
-  autopc-deploy:latest
+  fdim-deploy:latest
 ```
 
 ---
@@ -257,7 +257,7 @@ docker run -d \
 - **Backup Customer & Deployment Data**:
   All application state is kept in the host `./data` directory. Back it up anytime without stopping containers:
   ```bash
-  tar -czvf autopc-backup-$(date +%F).tar.gz ./data
+  tar -czvf fdim-backup-$(date +%F).tar.gz ./data
   ```
 - **Restart the Stack**:
   ```bash
@@ -283,8 +283,8 @@ For local contributors developing features or testing frontend changes without D
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-org/autopc-deploy.git
-   cd autopc-deploy
+   git clone https://github.com/your-org/fdim.git
+   cd fdim
    ```
 
 2. **Install dependencies**:
