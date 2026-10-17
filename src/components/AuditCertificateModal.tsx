@@ -102,7 +102,7 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
               <span>Applied System Configurations</span>
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 text-xs">
               <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
                 <span className="text-slate-400 block text-[11px]">Remote Desktop:</span>
                 <span className="font-semibold text-emerald-400">
@@ -118,9 +118,23 @@ export const AuditCertificateModal: React.FC<AuditCertificateModalProps> = ({
               </div>
 
               <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
-                <span className="text-slate-400 block text-[11px]">Power Plan Timeouts:</span>
+                <span className="text-slate-400 block text-[11px]">Power Plan:</span>
                 <span className="font-semibold text-white">
-                  Screen {record.systemConfig?.screenTimeoutAc ?? record.switchParameters?.screenTimeoutAc ?? 15}m • Standby {record.systemConfig?.standbyTimeoutAc === 0 || record.switchParameters?.standbyTimeoutAc === 0 ? 'Never' : `${record.systemConfig?.standbyTimeoutAc ?? 0}m`}
+                  {record.systemConfig?.screenTimeoutAc ?? record.switchParameters?.screenTimeoutAc ?? 15}m / {record.systemConfig?.standbyTimeoutAc === 0 || record.switchParameters?.standbyTimeoutAc === 0 ? 'Never' : `${record.systemConfig?.standbyTimeoutAc ?? 0}m`}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400 block text-[11px]">Local Administrator:</span>
+                <span className="font-semibold text-amber-400">
+                  {record.systemConfig?.enableLocalAdmin !== false ? 'Enabled (SID *-500)' : 'Disabled'}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
+                <span className="text-slate-400 block text-[11px]">OOBE Account:</span>
+                <span className="font-semibold text-rose-400 truncate block">
+                  {record.systemConfig?.deleteOobeAccount !== false ? `Purged ('${record.systemConfig?.oobeAccountName || 'install'}')` : 'Kept'}
                 </span>
               </div>
             </div>

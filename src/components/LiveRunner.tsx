@@ -165,6 +165,27 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
           logLines: [],
         });
       }
+      if (systemConfig.enableLocalAdmin !== false) {
+        initialSteps.push({
+          id: 'step-sys-sw-local-admin',
+          type: 'system',
+          title: 'Enable Local Administrator & Set Password',
+          subtext: 'Enables built-in Administrator (SID *-500) and sets secure administrator password',
+          status: 'pending',
+          logLines: [],
+        });
+      }
+      if (systemConfig.deleteOobeAccount !== false) {
+        const oobeName = systemConfig.oobeAccountName || 'install';
+        initialSteps.push({
+          id: 'step-sys-sw-delete-oobe',
+          type: 'system',
+          title: `Delete Temporary OOBE Setup Account ('${oobeName}')`,
+          subtext: `Purges temporary '${oobeName}' account and removes its user profile from C:\\Users`,
+          status: 'pending',
+          logLines: [],
+        });
+      }
     }
 
     // Software packages
@@ -304,6 +325,11 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
           const scr = switchParameters?.screenTimeoutAc ?? systemConfig.screenTimeoutAc;
           const stb = switchParameters?.standbyTimeoutAc ?? systemConfig.standbyTimeoutAc;
           successMsg = `[${finishTimeStr}] [SUCCESS] Power plan active: Screen timeout ${scr}m, Standby ${stb}m.`;
+        } else if (swId === 'sw-local-admin') {
+          successMsg = `[${finishTimeStr}] [SUCCESS] Built-in local Administrator enabled (SID *-500) and secure password configured (PasswordNeverExpires=True).`;
+        } else if (swId === 'sw-delete-oobe') {
+          const oobeName = switchParameters?.oobeAccountName || systemConfig.oobeAccountName || 'install';
+          successMsg = `[${finishTimeStr}] [SUCCESS] Temporary OOBE setup account [${oobeName}] expunged and user profile directory purged.`;
         } else if (matchingSwitch) {
           successMsg = `[${finishTimeStr}] [SUCCESS] Applied custom task: ${matchingSwitch.title}.`;
         }

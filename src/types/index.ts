@@ -70,6 +70,14 @@ export interface CustomerProfile {
     screenTimeoutAc: number;
     standbyTimeoutAc: number;
   };
+  localAdminSettings?: {
+    enableLocalAdmin: boolean;
+    defaultPassword?: string;
+    adminPasswordNeverExpires?: boolean;
+    deleteOobeAccount: boolean;
+    defaultOobeAccountName?: string;
+    removeOobeProfile?: boolean;
+  };
   packageIds: string[]; // Default software packages assigned to this customer
   packageCustomSwitches?: Record<string, string>; // packageId -> extra switches override
   packageConfigFiles?: Record<string, string>; // packageId -> config file path override
@@ -88,7 +96,7 @@ export interface SystemConfigSwitch {
   category: 'RemoteAccess' | 'Security' | 'Power' | 'Network' | 'Optimization' | 'Custom';
   powershellCommand: string;
   hasParameter?: boolean;
-  parameterKey?: string; // e.g. "adAdminGroupName", "screenTimeoutAc", "standbyTimeoutAc", "customParam"
+  parameterKey?: string; // e.g. "adAdminGroupName", "screenTimeoutAc", "standbyTimeoutAc", "customParam", "localAdminPassword", "oobeAccountName"
   parameterType?: 'text' | 'number' | 'select';
   parameterLabel?: string;
   parameterDefaultValue?: string | number;
@@ -104,6 +112,14 @@ export interface SystemConfigSettings {
   setPowerPlan: boolean;
   screenTimeoutAc: number;
   standbyTimeoutAc: number;
+  // Local Administrator Account Management
+  enableLocalAdmin?: boolean;
+  localAdminPassword?: string;
+  adminPasswordNeverExpires?: boolean;
+  // Temporary Windows OOBE Setup Account Cleanup
+  deleteOobeAccount?: boolean;
+  oobeAccountName?: string; // Default: 'install'
+  removeOobeProfile?: boolean; // Default: true
 }
 
 export interface ActiveSystemConfigState {

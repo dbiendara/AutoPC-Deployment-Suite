@@ -83,6 +83,15 @@ With FDIM, technicians can select or customize client profiles, enforce critical
 
 ### 🛡️ Enterprise Active Directory & System Configuration Switches
 - **Tailored for Existing Domain Members**: Optimized for PCs that already have hostnames (`$env:COMPUTERNAME`) and domain membership—no redundant serial numbers or employee assignee overhead.
+- **Local Administrator Account Provisioning**:
+  - Automatically identifies the built-in local Administrator account across any Windows language pack (using the well-known SID `S-1-5-21-*-500`).
+  - Enables the account (`Enable-LocalUser`) to guarantee emergency local recovery access.
+  - Configures a secure local administrator password (custom or one-click 16-character cryptographic generator compliant with Windows complexity requirements).
+  - Enforces `PasswordNeverExpires=$true` for long-term recovery stability.
+- **Temporary Windows OOBE Setup Account Cleanup ("install")**:
+  - Automatically locates and deletes the temporary local account created by technicians during initial Windows Out-Of-Box Experience (OOBE) setup screens (default username: `"install"`, with support for custom names like `setup`, `oobe`, `temp`).
+  - Cleans up and unregisters the user profile from `Win32_UserProfile` and purges the profile directory on disk (`C:\Users\install`) so no unmanaged or insecure temporary accounts remain on deployed endpoints.
+  - Safe execution: If the provisioning runner is currently executing inside the active session of the OOBE account, it automatically stages a safe post-reboot/logoff removal via `HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce`, preventing session termination.
 - **Enable Remote Desktop (RDP)**: Configures Terminal Server registry keys, enforces Network Level Authentication (NLA), and unblocks Remote Desktop in Windows Defender Firewall.
 - **Delegate AD Groups to Local Administrators**: Automatically adds specified Active Directory security groups (e.g., `DOMAIN\IT-DesktopAdmins`) into the local `Administrators` security group with domain resolution safety checks.
 - **Power Management (powercfg)**: Standardizes AC monitor sleep and standby/sleep timeouts via `powercfg.exe` to prevent workstations from sleeping during maintenance windows or user shifts. Optional switch toggle allows technicians to disable power scheme enforcement when desired.

@@ -130,6 +130,14 @@ export interface CustomerProfile {
     screenTimeoutAc: number;
     standbyTimeoutAc: number;
   };
+  localAdminSettings?: {
+    enableLocalAdmin: boolean;
+    defaultPassword?: string;
+    adminPasswordNeverExpires?: boolean;
+    deleteOobeAccount: boolean;
+    defaultOobeAccountName?: string;
+    removeOobeProfile?: boolean;
+  };
   packageIds: string[];
   packageCustomSwitches?: Record<string, string>;
   packageConfigFiles?: Record<string, string>;
@@ -163,6 +171,14 @@ export interface SystemConfigSettings {
   setPowerPlan: boolean;
   screenTimeoutAc: number;
   standbyTimeoutAc: number;
+  // Local Administrator Account Management
+  enableLocalAdmin?: boolean;
+  localAdminPassword?: string;
+  adminPasswordNeverExpires?: boolean;
+  // Temporary Windows OOBE Setup Account Cleanup
+  deleteOobeAccount?: boolean;
+  oobeAccountName?: string;
+  removeOobeProfile?: boolean;
 }
 
 export interface DeploymentRecord {
@@ -289,6 +305,35 @@ let systemConfigSwitches: SystemConfigSwitch[] = [
     powershellCommand: 'try { $installer = "C:\\ProgramData\\FDIM\\Install-FDIMAgent.ps1"; if (Test-Path $installer) { & $installer } } catch { Write-Warning "Agent setup: $_" }',
     enabledByDefault: true,
     isRemovable: true,
+  },
+  {
+    id: 'sw-local-admin',
+    key: 'enableLocalAdmin',
+    title: 'Enable Local Administrator & Set Password',
+    description: 'Enables the built-in local Administrator account (well-known SID *-500), configures a secure password, and sets password to never expire.',
+    category: 'Security',
+    hasParameter: true,
+    parameterKey: 'localAdminPassword',
+    parameterType: 'text',
+    parameterLabel: 'Local Admin Password',
+    parameterDefaultValue: 'P@ssw0rd!2026Secure',
+    powershellCommand: 'try { $adm = Get-LocalUser -ErrorAction SilentlyContinue | Where-Object { $_.SID.Value -like "*-500" -or $_.SID -like "*-500" } | Select-Object -First 1; if (-not $adm) { $adm = Get-LocalUser -Name "Administrator" -ErrorAction SilentlyContinue }; if ($adm) { Enable-LocalUser -Name $adm.Name; $sec = ConvertTo-SecureString "{{localAdminPassword}}" -AsPlainText -Force; Set-LocalUser -Name $adm.Name -Password $sec; Set-LocalUser -Name $adm.Name -PasswordNeverExpires $true; Write-Output "Local Administrator enabled and password configured." } else { Write-Warning "Built-in Administrator not found." } } catch { Write-Warning "Local admin setup: $_" }',
+    enabledByDefault: true,
+    isRemovable: false,
+  },
+  {
+    id: 'sw-delete-oobe',
+    key: 'deleteOobeAccount',
+    title: 'Delete Temporary OOBE Setup Account ("install")',
+    description: 'Deletes the temporary local account used during Windows OOBE setup and purges its profile directory from C:\\Users.',
+    category: 'Security',
+    hasParameter: true,
+    parameterKey: 'oobeAccountName',
+    parameterType: 'text',
+    parameterLabel: 'OOBE Account Name',
+    powershellCommand: 'try { $u = "{{oobeAccountName}}"; $usr = Get-LocalUser -Name $u -ErrorAction SilentlyContinue; if ($usr) { Remove-LocalUser -Name $u -ErrorAction SilentlyContinue; $p = "C:\\Users\\" + $u; if (Test-Path $p) { Get-CimInstance Win32_UserProfile -ErrorAction SilentlyContinue | Where-Object { $_.LocalPath -eq $p } | Remove-CimInstance -ErrorAction SilentlyContinue; if (Test-Path $p) { Remove-Item -Path $p -Recurse -Force -ErrorAction SilentlyContinue } }; Write-Output ("Temporary OOBE account " + $u + " deleted.") } else { Write-Output ("OOBE account " + $u + " not found.") } } catch { Write-Warning ("OOBE cleanup: " + $_) }',
+    enabledByDefault: true,
+    isRemovable: false,
   },
 ];
 
@@ -2291,7 +2336,17 @@ app.post('/api/scripts/generate', (req, res) => {
     });
   }
 
-  // Filter out power switches if power plan configuration is toggled off
+  const isLocalAdminEnabled = (selectedSwitchIds ? selectedSwitchIds.includes('sw-local-admin') : true) && (systemConfig?.enableLocalAdmin !== false);
+  const localAdminPassword = switchParameters?.localAdminPassword || systemConfig?.localAdminPassword || 'P@ssw0rd!2026Secure';
+  const adminPasswordNeverExpires = systemConfig?.adminPasswordNeverExpires !== false;
+
+  const isDeleteOobeEnabled = (selectedSwitchIds ? selectedSwitchIds.includes('sw-delete-oobe') : true) && (systemConfig?.deleteOobeAccount !== false);
+  const oobeAccountName = (switchParameters?.oobeAccountName || systemConfig?.oobeAccountName || 'install').toString().trim() || 'install';
+  const removeOobeProfile = systemConfig?.removeOobeProfile !== false;
+
+  const genericSwitches = targetSwitches.filter((s) => s.id !== 'sw-local-admin' && s.id !== 'sw-delete-oobe');
+
+  // Determine which switches to run
   if (!isPowerPlanEnabled) {
     targetSwitches = targetSwitches.filter((s) => s.id !== 'sw-power-screen' && s.id !== 'sw-power-standby');
   }
@@ -2360,7 +2415,7 @@ if ($domainStatus) {
 # ------------------------------------------------------------------------------
 Write-DeployLog "Phase 2: Executing System Configuration Tasks..."
 
-${targetSwitches
+${genericSwitches
   .map((sw) => {
     let cmd = sw.powershellCommand;
     // Replace parameter placeholders
@@ -2389,6 +2444,87 @@ try {
 `;
   })
   .join('\n')}
+
+# ------------------------------------------------------------------------------
+# PHASE 2B: LOCAL ADMINISTRATOR & OOBE SETUP ACCOUNT MANAGEMENT
+# ------------------------------------------------------------------------------
+${
+  isLocalAdminEnabled
+    ? `
+# --- Configure Built-in Local Administrator Account ---
+try {
+    Write-DeployLog "Phase 2B: Locating built-in local Administrator account (well-known SID *-500)..."
+    $admin = Get-LocalUser -ErrorAction SilentlyContinue | Where-Object { $_.SID.Value -like "*-500" -or $_.SID -like "*-500" } | Select-Object -First 1
+    if (-not $admin) {
+        $admin = Get-LocalUser -Name "Administrator" -ErrorAction SilentlyContinue
+    }
+    if ($admin) {
+        Write-DeployLog "Found local Administrator account: $($admin.Name). Enabling account..."
+        Enable-LocalUser -Name $admin.Name -ErrorAction Stop
+        $plainPass = '${String(localAdminPassword).replace(/'/g, "''")}'
+        $secPass = ConvertTo-SecureString $plainPass -AsPlainText -Force
+        Set-LocalUser -Name $admin.Name -Password $secPass -ErrorAction Stop
+        ${adminPasswordNeverExpires ? `Set-LocalUser -Name $admin.Name -PasswordNeverExpires $true -ErrorAction SilentlyContinue` : ''}
+        Write-DeployLog "Local Administrator ($($admin.Name)) enabled and password updated successfully (PasswordNeverExpires=${adminPasswordNeverExpires})." "SUCCESS"
+    } else {
+        Write-DeployLog "Built-in Administrator account not found via SID *-500 or standard name." "WARN"
+    }
+} catch {
+    Write-DeployLog "Error configuring local Administrator: $($_.Exception.Message)" "ERROR"
+}
+`
+    : ''
+}
+
+${
+  isDeleteOobeEnabled
+    ? `
+# --- Clean Temporary Windows OOBE Setup Account ---
+try {
+    $oobeTarget = '${String(oobeAccountName).replace(/'/g, "''")}'
+    Write-DeployLog "Phase 2B: Checking for temporary OOBE setup account: '$oobeTarget'..."
+    $oobeUser = Get-LocalUser -Name $oobeTarget -ErrorAction SilentlyContinue
+    if ($oobeUser) {
+        Write-DeployLog "Found temporary local OOBE setup account '$oobeTarget'."
+        $currentLoggedIn = $env:USERNAME
+        if ($currentLoggedIn -ieq $oobeTarget) {
+            Write-DeployLog "Notice: Provisioning is running under active session of '$oobeTarget'. Staging post-reboot purge via HKLM RunOnce..." "WARN"
+            $purgeCmd = "powershell.exe -ExecutionPolicy Bypass -Command \`"Start-Sleep 5; Remove-LocalUser -Name '$oobeTarget' -ErrorAction SilentlyContinue; Get-CimInstance Win32_UserProfile | Where-Object { \`$_.LocalPath -eq 'C:\\Users\\$oobeTarget' } | Remove-CimInstance -ErrorAction SilentlyContinue; if (Test-Path 'C:\\Users\\$oobeTarget') { Remove-Item 'C:\\Users\\$oobeTarget' -Recurse -Force -ErrorAction SilentlyContinue }\`""
+            Set-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce" -Name "FDIM_PurgeOobeAccount" -Value $purgeCmd -Force
+            Write-DeployLog "RunOnce purge staged for '$oobeTarget' upon next reboot/logoff." "SUCCESS"
+        } else {
+            Remove-LocalUser -Name $oobeTarget -ErrorAction Stop
+            Write-DeployLog "Deleted temporary OOBE local user account: '$oobeTarget'." "SUCCESS"
+            
+            ${
+              removeOobeProfile
+                ? `
+            $profilePath = "C:\\Users\\$oobeTarget"
+            if (Test-Path $profilePath) {
+                Write-DeployLog "Purging OOBE user profile folder at $profilePath..."
+                $wmiProf = Get-CimInstance Win32_UserProfile -ErrorAction SilentlyContinue | Where-Object { $_.LocalPath -eq $profilePath }
+                if ($wmiProf) {
+                    $wmiProf | Remove-CimInstance -ErrorAction SilentlyContinue
+                    Write-DeployLog "Unregistered Win32_UserProfile for $oobeTarget." "SUCCESS"
+                }
+                if (Test-Path $profilePath) {
+                    Remove-Item -Path $profilePath -Recurse -Force -ErrorAction SilentlyContinue
+                    Write-DeployLog "Purged OOBE profile directory $profilePath." "SUCCESS"
+                }
+            }
+            `
+                : ''
+            }
+        }
+    } else {
+        Write-DeployLog "Temporary OOBE account '$oobeTarget' does not exist on this machine (already removed or not used)." "INFO"
+    }
+} catch {
+    Write-DeployLog "Warning handling OOBE account removal: $($_.Exception.Message)" "WARN"
+}
+`
+    : ''
+}
 
 # ------------------------------------------------------------------------------
 # PHASE 3: SOFTWARE DEPLOYMENT (UNC NETWORK SHARES & WINGET)

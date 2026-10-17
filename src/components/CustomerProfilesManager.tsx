@@ -262,6 +262,14 @@ export const CustomerProfilesManager: React.FC<CustomerProfilesManagerProps> = (
         scheduledTaskFallback: true,
         cleanUpAfterFirstRun: false,
       },
+      localAdminSettings: editingCustomer?.localAdminSettings || {
+        enableLocalAdmin: true,
+        defaultPassword: 'P@ssw0rd!2026Secure',
+        adminPasswordNeverExpires: true,
+        deleteOobeAccount: true,
+        defaultOobeAccountName: 'install',
+        removeOobeProfile: true,
+      },
       notes,
     };
 

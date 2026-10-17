@@ -114,12 +114,9 @@ export function seedInitialDataIfEmpty(
     }
   }
 
-  const switchCount = (db.prepare('SELECT COUNT(*) as cnt FROM system_switches').get() as { cnt: number }).cnt;
-  if (switchCount === 0) {
-    const insertSwitch = db.prepare('INSERT INTO system_switches (id, data, updated_at) VALUES (?, ?, ?)');
-    for (const sw of initialSwitches) {
-      insertSwitch.run(sw.id, JSON.stringify(sw), new Date().toISOString());
-    }
+  const insertSwitch = db.prepare('INSERT OR IGNORE INTO system_switches (id, data, updated_at) VALUES (?, ?, ?)');
+  for (const sw of initialSwitches) {
+    insertSwitch.run(sw.id, JSON.stringify(sw), new Date().toISOString());
   }
 
   const depCount = (db.prepare('SELECT COUNT(*) as cnt FROM deployments').get() as { cnt: number }).cnt;

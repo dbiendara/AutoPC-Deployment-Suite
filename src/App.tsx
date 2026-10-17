@@ -112,11 +112,13 @@ export default function App() {
   });
 
   // Dynamic system configuration switch states
-  const [enabledSwitchIds, setEnabledSwitchIds] = useState<string[]>(() => initialDraft?.enabledSwitchIds || ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby']);
+  const [enabledSwitchIds, setEnabledSwitchIds] = useState<string[]>(() => initialDraft?.enabledSwitchIds || ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby', 'sw-local-admin', 'sw-delete-oobe']);
   const [switchParameters, setSwitchParameters] = useState<Record<string, string | number>>(() => initialDraft?.switchParameters || {
     adAdminGroupName: 'ACME\\IT-Workstation-Admins',
     screenTimeoutAc: 15,
     standbyTimeoutAc: 0,
+    localAdminPassword: 'P@ssw0rd!2026Secure',
+    oobeAccountName: 'install',
   });
 
   // Legacy system configuration settings (kept in sync)
@@ -127,6 +129,12 @@ export default function App() {
     setPowerPlan: true,
     screenTimeoutAc: 15,
     standbyTimeoutAc: 0,
+    enableLocalAdmin: true,
+    localAdminPassword: 'P@ssw0rd!2026Secure',
+    adminPasswordNeverExpires: true,
+    deleteOobeAccount: true,
+    oobeAccountName: 'install',
+    removeOobeProfile: true,
   });
 
   // Runner & Modals

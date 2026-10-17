@@ -43,6 +43,12 @@ import {
   Printer,
   Link2,
   Save,
+  Key,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  UserX,
+  Lock,
 } from 'lucide-react';
 import {
   loadWizardDraft,
@@ -136,6 +142,13 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
       setPackageConfigFiles(customer.packageConfigFiles);
     }
     const powerEnabled = customer.powerPlanSettings?.enabled !== false;
+    const localAdminEnabled = customer.localAdminSettings?.enableLocalAdmin ?? true;
+    const localAdminPwd = customer.localAdminSettings?.defaultPassword || 'P@ssw0rd!2026Secure';
+    const pwdNeverExpires = customer.localAdminSettings?.adminPasswordNeverExpires ?? true;
+    const delOobe = customer.localAdminSettings?.deleteOobeAccount ?? true;
+    const oobeName = customer.localAdminSettings?.defaultOobeAccountName || 'install';
+    const removeProfile = customer.localAdminSettings?.removeOobeProfile ?? true;
+
     setSystemConfig((prev) => ({
       ...prev,
       enableRdp: customer.enableRdp,
@@ -143,12 +156,20 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
       setPowerPlan: powerEnabled,
       screenTimeoutAc: customer.powerPlanSettings?.screenTimeoutAc ?? 15,
       standbyTimeoutAc: customer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+      enableLocalAdmin: localAdminEnabled,
+      localAdminPassword: localAdminPwd,
+      adminPasswordNeverExpires: pwdNeverExpires,
+      deleteOobeAccount: delOobe,
+      oobeAccountName: oobeName,
+      removeOobeProfile: removeProfile,
     }));
     setSwitchParameters((prev) => ({
       ...prev,
       adAdminGroupName: customer.defaultAdAdminGroup,
       screenTimeoutAc: customer.powerPlanSettings?.screenTimeoutAc ?? 15,
       standbyTimeoutAc: customer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+      localAdminPassword: localAdminPwd,
+      oobeAccountName: oobeName,
     }));
     if (customer.networkDrives) {
       setStagedDrives(customer.networkDrives);
@@ -227,6 +248,13 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
     setPackageCustomSwitches(currentCustomer.packageCustomSwitches || {});
     setPackageConfigFiles(currentCustomer.packageConfigFiles || {});
     const powerEnabled = currentCustomer.powerPlanSettings?.enabled !== false;
+    const localAdminEnabled = currentCustomer.localAdminSettings?.enableLocalAdmin ?? true;
+    const localAdminPwd = currentCustomer.localAdminSettings?.defaultPassword || 'P@ssw0rd!2026Secure';
+    const pwdNeverExpires = currentCustomer.localAdminSettings?.adminPasswordNeverExpires ?? true;
+    const delOobe = currentCustomer.localAdminSettings?.deleteOobeAccount ?? true;
+    const oobeName = currentCustomer.localAdminSettings?.defaultOobeAccountName || 'install';
+    const removeProfile = currentCustomer.localAdminSettings?.removeOobeProfile ?? true;
+
     setSystemConfig({
       enableRdp: currentCustomer.enableRdp,
       addAdGroupToAdmins: true,
@@ -234,11 +262,19 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
       setPowerPlan: powerEnabled,
       screenTimeoutAc: currentCustomer.powerPlanSettings?.screenTimeoutAc ?? 15,
       standbyTimeoutAc: currentCustomer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+      enableLocalAdmin: localAdminEnabled,
+      localAdminPassword: localAdminPwd,
+      adminPasswordNeverExpires: pwdNeverExpires,
+      deleteOobeAccount: delOobe,
+      oobeAccountName: oobeName,
+      removeOobeProfile: removeProfile,
     });
     setSwitchParameters({
       adAdminGroupName: currentCustomer.defaultAdAdminGroup,
       screenTimeoutAc: currentCustomer.powerPlanSettings?.screenTimeoutAc ?? 15,
       standbyTimeoutAc: currentCustomer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+      localAdminPassword: localAdminPwd,
+      oobeAccountName: oobeName,
     });
     setStagedDrives(currentCustomer.networkDrives || []);
     setStagedPrinters(currentCustomer.printers || []);
@@ -251,11 +287,13 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
       selectedPackageIds: currentCustomer.packageIds || [],
       packageCustomSwitches: currentCustomer.packageCustomSwitches || {},
       packageConfigFiles: currentCustomer.packageConfigFiles || {},
-      enabledSwitchIds: ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby'],
+      enabledSwitchIds: ['sw-rdp', 'sw-adgroup', 'sw-power-screen', 'sw-power-standby', 'sw-local-admin', 'sw-delete-oobe'],
       switchParameters: {
         adAdminGroupName: currentCustomer.defaultAdAdminGroup,
         screenTimeoutAc: currentCustomer.powerPlanSettings?.screenTimeoutAc ?? 15,
         standbyTimeoutAc: currentCustomer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+        localAdminPassword: localAdminPwd,
+        oobeAccountName: oobeName,
       },
       systemConfig: {
         enableRdp: currentCustomer.enableRdp,
@@ -264,6 +302,12 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
         setPowerPlan: powerEnabled,
         screenTimeoutAc: currentCustomer.powerPlanSettings?.screenTimeoutAc ?? 15,
         standbyTimeoutAc: currentCustomer.powerPlanSettings?.standbyTimeoutAc ?? 0,
+        enableLocalAdmin: localAdminEnabled,
+        localAdminPassword: localAdminPwd,
+        adminPasswordNeverExpires: pwdNeverExpires,
+        deleteOobeAccount: delOobe,
+        oobeAccountName: oobeName,
+        removeOobeProfile: removeProfile,
       },
       stagedDrives: currentCustomer.networkDrives || [],
       stagedPrinters: currentCustomer.printers || [],
@@ -351,6 +395,54 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
     );
   };
 
+  // Local Administrator & OOBE helper state
+  const [showPassword, setShowPassword] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+
+  const handleGenerateAdminPassword = () => {
+    const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lower = 'abcdefghjkmnpqrstuvwxyz';
+    const digits = '23456789';
+    const symbols = '!@#$%^&*-_+=';
+    const all = upper + lower + digits + symbols;
+    let pwd = '';
+    pwd += upper[Math.floor(Math.random() * upper.length)];
+    pwd += lower[Math.floor(Math.random() * lower.length)];
+    pwd += digits[Math.floor(Math.random() * digits.length)];
+    pwd += symbols[Math.floor(Math.random() * symbols.length)];
+    for (let i = 4; i < 16; i++) {
+      pwd += all[Math.floor(Math.random() * all.length)];
+    }
+    const newPwd = pwd.split('').sort(() => 0.5 - Math.random()).join('');
+    setSystemConfig((prev) => ({ ...prev, localAdminPassword: newPwd }));
+    setSwitchParameters((prev) => ({ ...prev, localAdminPassword: newPwd }));
+  };
+
+  const handleCopyAdminPassword = () => {
+    const pwd = systemConfig.localAdminPassword || switchParameters.localAdminPassword || 'P@ssw0rd!2026Secure';
+    navigator.clipboard.writeText(String(pwd));
+    setCopiedPassword(true);
+    setTimeout(() => setCopiedPassword(false), 2000);
+  };
+
+  const handleToggleLocalAdmin = (enabled: boolean) => {
+    setSystemConfig((prev) => ({ ...prev, enableLocalAdmin: enabled }));
+    setEnabledSwitchIds((prev) =>
+      enabled
+        ? prev.includes('sw-local-admin') ? prev : [...prev, 'sw-local-admin']
+        : prev.filter((id) => id !== 'sw-local-admin')
+    );
+  };
+
+  const handleToggleDeleteOobe = (enabled: boolean) => {
+    setSystemConfig((prev) => ({ ...prev, deleteOobeAccount: enabled }));
+    setEnabledSwitchIds((prev) =>
+      enabled
+        ? prev.includes('sw-delete-oobe') ? prev : [...prev, 'sw-delete-oobe']
+        : prev.filter((id) => id !== 'sw-delete-oobe')
+    );
+  };
+
   // Toggle switch
   const toggleSwitch = (switchId: string) => {
     const isEnabling = !enabledSwitchIds.includes(switchId);
@@ -365,6 +457,10 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
       setSystemConfig((prev) => ({ ...prev, addAdGroupToAdmins: isEnabling }));
     } else if (switchId === 'sw-power-screen' || switchId === 'sw-power-standby') {
       setSystemConfig((prev) => ({ ...prev, setPowerPlan: isEnabling }));
+    } else if (switchId === 'sw-local-admin') {
+      setSystemConfig((prev) => ({ ...prev, enableLocalAdmin: isEnabling }));
+    } else if (switchId === 'sw-delete-oobe') {
+      setSystemConfig((prev) => ({ ...prev, deleteOobeAccount: isEnabling }));
     }
   };
 
@@ -379,6 +475,10 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
       setSystemConfig((prev) => ({ ...prev, screenTimeoutAc: Number(value) }));
     } else if (key === 'standbyTimeoutAc') {
       setSystemConfig((prev) => ({ ...prev, standbyTimeoutAc: Number(value) }));
+    } else if (key === 'localAdminPassword') {
+      setSystemConfig((prev) => ({ ...prev, localAdminPassword: String(value) }));
+    } else if (key === 'oobeAccountName') {
+      setSystemConfig((prev) => ({ ...prev, oobeAccountName: String(value) }));
     }
   };
 
@@ -605,6 +705,223 @@ export const NewPCWizard: React.FC<NewPCWizardProps> = ({
               <Sliders className="w-3.5 h-3.5 text-purple-400" />
               <span>Manage / Add Switches</span>
             </button>
+          </div>
+        </div>
+
+        {/* Local Administrator & Windows OOBE Setup Account Management Card */}
+        <div className="mb-6 p-5 rounded-xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 shadow-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800 mb-4">
+            <div className="flex items-center space-x-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                  <span>Local Administrator & Windows OOBE Setup Account Management</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-950/80 border border-amber-800 text-amber-300 font-mono">
+                    Zero-Touch Setup
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Provision emergency local admin credentials and securely purge the temporary local account used during Windows OOBE setup screens
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Card 1: Enable Local Administrator & Set Password */}
+            <div
+              className={`p-4 rounded-xl border transition-all ${
+                systemConfig.enableLocalAdmin !== false
+                  ? 'bg-slate-900/90 border-amber-500/50 shadow-sm'
+                  : 'bg-slate-900/40 border-slate-800 opacity-60'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <label className="text-xs font-bold text-white flex items-center space-x-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={systemConfig.enableLocalAdmin !== false}
+                    onChange={(e) => handleToggleLocalAdmin(e.target.checked)}
+                    className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-amber-200">Enable Built-in Local Administrator</span>
+                </label>
+                <span className="text-[10px] text-slate-500 font-mono">SID *-500</span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+                Enables the built-in local Administrator account (well-known SID *-500) for emergency local recovery and sets a secure password.
+              </p>
+
+              {systemConfig.enableLocalAdmin !== false && (
+                <div className="space-y-3 pt-2.5 border-t border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] uppercase font-mono text-slate-400">
+                      Local Administrator Password:
+                    </label>
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        type="button"
+                        onClick={handleGenerateAdminPassword}
+                        className="text-[10px] px-2 py-0.5 rounded bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-700/60 transition-colors flex items-center space-x-1 cursor-pointer font-medium"
+                        title="Generate a cryptographically strong 16-character password"
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" />
+                        <span>Generate Strong</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyAdminPassword}
+                        className="text-[10px] px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center space-x-1 cursor-pointer"
+                        title="Copy administrator password to clipboard"
+                      >
+                        {copiedPassword ? (
+                          <Check className="w-2.5 h-2.5 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-2.5 h-2.5" />
+                        )}
+                        <span>{copiedPassword ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={
+                        systemConfig.localAdminPassword ??
+                        switchParameters.localAdminPassword ??
+                        'P@ssw0rd!2026Secure'
+                      }
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSystemConfig((prev) => ({ ...prev, localAdminPassword: val }));
+                        setSwitchParameters((prev) => ({ ...prev, localAdminPassword: val }));
+                      }}
+                      placeholder="Enter strong administrator password"
+                      className="w-full bg-slate-950 border border-amber-500/40 rounded-lg pl-3 pr-10 py-1.5 text-xs text-amber-300 font-mono focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+
+                  <label className="text-[11px] text-slate-300 flex items-center space-x-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={systemConfig.adminPasswordNeverExpires !== false}
+                      onChange={(e) =>
+                        setSystemConfig((prev) => ({
+                          ...prev,
+                          adminPasswordNeverExpires: e.target.checked,
+                        }))
+                      }
+                      className="rounded border-slate-700 text-amber-500 focus:ring-amber-400 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span>
+                      Password never expires (
+                      <code className="text-amber-400 font-mono text-[10px]">PasswordNeverExpires=$true</code>)
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Card 2: Delete Temporary OOBE Setup Account ("install") */}
+            <div
+              className={`p-4 rounded-xl border transition-all ${
+                systemConfig.deleteOobeAccount !== false
+                  ? 'bg-slate-900/90 border-rose-500/50 shadow-sm'
+                  : 'bg-slate-900/40 border-slate-800 opacity-60'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <label className="text-xs font-bold text-white flex items-center space-x-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={systemConfig.deleteOobeAccount !== false}
+                    onChange={(e) => handleToggleDeleteOobe(e.target.checked)}
+                    className="rounded border-slate-700 text-rose-500 focus:ring-rose-400 w-4 h-4 cursor-pointer"
+                  />
+                  <span className="text-rose-200">Delete Temporary OOBE Setup Account</span>
+                </label>
+                <span className="text-[10px] text-rose-400 font-mono uppercase bg-rose-950/70 border border-rose-800/80 px-1.5 py-0.5 rounded">
+                  OOBE Cleanup
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+                Deletes the local account created during initial Windows setup screens (e.g. <span className="font-mono text-rose-300 font-semibold">"install"</span>) and cleans its profile directory from disk.
+              </p>
+
+              {systemConfig.deleteOobeAccount !== false && (
+                <div className="space-y-3 pt-2.5 border-t border-slate-800">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] uppercase font-mono text-slate-400">
+                        OOBE Account Username:
+                      </label>
+                      <div className="flex items-center space-x-1">
+                        {['install', 'setup', 'oobe', 'temp'].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => {
+                              setSystemConfig((prev) => ({ ...prev, oobeAccountName: chip }));
+                              setSwitchParameters((prev) => ({ ...prev, oobeAccountName: chip }));
+                            }}
+                            className={`text-[9px] px-1.5 py-0.5 rounded font-mono transition-colors cursor-pointer ${
+                              (systemConfig.oobeAccountName || 'install') === chip
+                                ? 'bg-rose-900 text-rose-200 border border-rose-700 font-bold'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {chip}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={systemConfig.oobeAccountName ?? switchParameters.oobeAccountName ?? 'install'}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSystemConfig((prev) => ({ ...prev, oobeAccountName: val }));
+                        setSwitchParameters((prev) => ({ ...prev, oobeAccountName: val }));
+                      }}
+                      placeholder="e.g. install"
+                      className="w-full bg-slate-950 border border-rose-500/40 rounded-lg px-3 py-1.5 text-xs text-rose-300 font-mono focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-400"
+                    />
+                  </div>
+
+                  <label className="text-[11px] text-slate-300 flex items-center space-x-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={systemConfig.removeOobeProfile !== false}
+                      onChange={(e) =>
+                        setSystemConfig((prev) => ({ ...prev, removeOobeProfile: e.target.checked }))
+                      }
+                      className="rounded border-slate-700 text-rose-500 focus:ring-rose-400 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span>
+                      Purge user profile folder from disk (
+                      <code className="text-rose-400 font-mono text-[10px]">
+                        C:\Users\{systemConfig.oobeAccountName || 'install'}
+                      </code>
+                      )
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
