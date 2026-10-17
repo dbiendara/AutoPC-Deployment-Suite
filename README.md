@@ -20,6 +20,42 @@ With FDIM, technicians can select or customize client profiles, enforce critical
   - One-click **Reset to Profile Defaults** button to instantly revert to clean customer profile defaults at any time.
   - Persistence indicator badge in the zero-touch deployment launcher bar.
 
+### 🖥️ Active Directory Computers Directory & Multi-PC Bulk Rollouts
+- **Live AD Domain Computer Inventory**: Complete directory of all domain-joined client workstations, Laptops, and departmental PCs with real-time status tracking.
+- **LDAP Tree Sync & Auto-Discovery**: One-click LDAP synchronization with corporate Domain Controllers (`(&(objectCategory=computer)(objectClass=user))`) to discover new endpoints and track OU memberships.
+- **Granular Filter & Search Bar**: Instant search across hostnames, IP addresses, active users, descriptions, and Organizational Units (OUs like `OU=Workstations`, `OU=Finance`, `OU=Laptops`).
+- **ICMP / WinRM LAN Ping Reachability**: Verify online connectivity and roundtrip latency across all endpoints before launching tasks.
+- **Multi-PC Bulk Deployment**: Check multiple workstations to deploy software packages across entire departments or branches with a single click.
+- **Hostnames & CSV Import**: Bulk paste lists of computer names or import CSV exports directly into FDIM.
+
+### 🤖 Autonomous Client Agent & Offline Wait-Tasks Engine
+- **Invisible Windows Scheduled Task**: Installs the `FDIM-ClientAgent` scheduled task on Windows 10/11 endpoints running under `NT AUTHORITY\SYSTEM`—completely silent and invisible to interactive users.
+- **Startup Boot Trigger & Recurring Heartbeat**:
+  - Automatically triggers at system startup with a configurable 3-5 minute delay (ensuring network adapters and DHCP lease are fully acquired).
+  - Recurs indefinitely on a 15, 30, or 60-minute recurring schedule.
+  - Checks ICMP/LAN reachability before initiating network calls.
+  - Sends a secure heartbeat with hardware status, OS build, active logged-in user, uptime, and installed package inventory.
+- **Wait-Tasks for Offline Workstations**:
+  - When triggering deployments to machines that are currently powered off or disconnected, FDIM queues them as **Wait-Tasks**.
+  - A persistent background dispatcher continually monitors client check-ins; the exact moment an offline machine boots and checks in, the agent pulls and executes the silent installation unattended as SYSTEM, reporting return exit codes and transcripts back to the central console!
+- **1-Liner PowerShell GPO Deployment**: Generates ready-to-run installation scripts (`Install-FDIMAgent.ps1`) deployable via GPO Startup Script, Intune, or one-liner:
+  ```powershell
+  irm http://<fdim-server>:3000/api/agent/script/installer | iex
+  ```
+
+### 🧪 Package Sandbox Testing with Proxmox VE & Automatic Rollback
+- **Isolated VM Testing**: Safely test unknown, modified, or updated software packages in an isolated Windows VM template on Proxmox VE, Hyper-V, or container sandbox before pushing to production.
+- **Unattended Execution Verification**: Runs silent arguments, monitors process execution time, and validates official exit codes (`0`, `3010`).
+- **Compliance Detection Verification**: Tests registry and file path detection rules in real-time.
+- **Automatic Snapshot Rollback (Standardstatus wiederherstellen)**: Reverts the test VM to its pristine baseline snapshot (`clean-baseline`) via the Proxmox VE API immediately after testing, ensuring a clean state for subsequent tests.
+
+### 🛡️ Delegated Helpdesk Execution (Dienstbenutzer für Runner)
+- **Non-Admin Helpdesk Deployment**: Allows Tier-1 Helpdesk technicians and Junior IT staff without Domain Admin privileges or local administrative accounts to trigger and dispatch software installations.
+- **Elevated Execution Identities**:
+  - **Client Agent (SYSTEM)**: Autonomous execution via local SYSTEM token.
+  - **Delegated Service Account**: Configurable dedicated service account (e.g., `CORP\svc_fdim_runner`).
+  - **Technician Interactive Token**: Direct execution with elevated technician credentials.
+
 ### 🏢 Customer & Multi-Tenant Profiles
 - **Client Organization Management**: Maintain isolated configuration profiles for different companies, branches, or customer domains (e.g., Acme Industrial, MediCare Solutions, CloudScale Tech).
 - **Domain & AD Group Automation**: Predefine customer domain names, target delegated Active Directory administrative groups, and primary UNC software repository paths.

@@ -27,7 +27,9 @@ import {
   Terminal,
   CloudDownload,
   Package,
+  Box,
 } from 'lucide-react';
+import { PackageSandboxModal } from './PackageSandboxModal';
 
 interface PackageLibraryProps {
   packages: SoftwarePackage[];
@@ -52,6 +54,7 @@ export const PackageLibrary: React.FC<PackageLibraryProps> = ({
   // Manual package form state
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPkgId, setEditingPkgId] = useState<string | null>(null);
+  const [sandboxPkg, setSandboxPkg] = useState<SoftwarePackage | null>(null);
 
   // Source Type: UNC share or Winget
   const [sourceType, setSourceType] = useState<'unc' | 'winget'>('unc');
@@ -1062,6 +1065,15 @@ export const PackageLibrary: React.FC<PackageLibraryProps> = ({
 
                 <div className="flex items-center space-x-2 self-end md:self-center shrink-0">
                   <button
+                    onClick={() => setSandboxPkg(pkg)}
+                    className="text-xs px-2.5 py-1.5 rounded-lg bg-purple-950/80 hover:bg-purple-900 border border-purple-800/80 text-purple-300 hover:text-white flex items-center space-x-1 cursor-pointer transition-colors"
+                    title="Test package in isolated Proxmox VM with automatic snapshot rollback"
+                  >
+                    <Box className="w-3.5 h-3.5 text-purple-400" />
+                    <span className="hidden sm:inline">Sandbox Test</span>
+                  </button>
+
+                  <button
                     onClick={() => openEditForm(pkg)}
                     className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center space-x-1 cursor-pointer"
                     title="Edit package details"
@@ -1150,6 +1162,18 @@ export const PackageLibrary: React.FC<PackageLibraryProps> = ({
           );
         })}
       </div>
+
+      {sandboxPkg && (
+        <PackageSandboxModal
+          isOpen={!!sandboxPkg}
+          onClose={() => setSandboxPkg(null)}
+          pkg={sandboxPkg}
+          onPackageVerified={(updated) => {
+            if (onUpdatePackage) onUpdatePackage(updated);
+            setSandboxPkg(updated);
+          }}
+        />
+      )}
     </div>
   );
 };

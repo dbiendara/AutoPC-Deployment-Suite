@@ -19,6 +19,10 @@ import {
   HardDrive,
   FileCode,
   Terminal,
+  UserCheck,
+  Radio,
+  RotateCcw,
+  Box,
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -32,7 +36,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   onSettingsUpdated,
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'sqlite' | 'auth' | 'docker'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'sqlite' | 'auth' | 'runner' | 'proxmox' | 'agent' | 'docker'>('general');
   const [settings, setSettings] = useState<AppSettings>({
     defaultGlobalDomain: 'corp.internal.net',
     authMode: 'local',
@@ -50,6 +54,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       clientId: 'fdim-suite',
       clientSecret: '',
       redirectUri: 'https://fdim.corp.internal.net/oauth/callback',
+    },
+    runnerServiceAccount: {
+      enabled: true,
+      username: 'CORP\\svc_fdim_runner',
+      domain: 'CORP',
+      description: 'Dedicated elevated service account for Helpdesk delegated package deployment without local admin rights',
+      delegatedHelpdeskAllowed: true,
+    },
+    proxmoxConfig: {
+      enabled: true,
+      apiUrl: 'https://pve01.corp.internal:8006/api2/json',
+      node: 'pve-node1',
+      vmTemplateId: 9000,
+      cleanSnapshotName: 'clean-baseline',
+      autoRollback: true,
+    },
+    agentConfig: {
+      heartbeatIntervalMinutes: 30,
+      bootDelayMinutes: 5,
+      serverUrl: 'http://fdim.corp.internal:3000',
     },
   });
 
@@ -179,26 +203,62 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           <button
             onClick={() => setActiveTab('auth')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 transition-colors ${
+            className={`py-3 px-3.5 border-b-2 flex items-center space-x-1.5 transition-colors whitespace-nowrap ${
               activeTab === 'auth'
                 ? 'border-cyan-500 text-cyan-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Shield className="w-4 h-4" />
-            <span>Active Directory & Keycloak</span>
+            <span>AD / Keycloak</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('runner')}
+            className={`py-3 px-3.5 border-b-2 flex items-center space-x-1.5 transition-colors whitespace-nowrap ${
+              activeTab === 'runner'
+                ? 'border-cyan-500 text-cyan-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <UserCheck className="w-4 h-4 text-emerald-400" />
+            <span>Dienstbenutzer (Helpdesk)</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('proxmox')}
+            className={`py-3 px-3.5 border-b-2 flex items-center space-x-1.5 transition-colors whitespace-nowrap ${
+              activeTab === 'proxmox'
+                ? 'border-cyan-500 text-cyan-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Box className="w-4 h-4 text-purple-400" />
+            <span>Proxmox Sandbox</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('agent')}
+            className={`py-3 px-3.5 border-b-2 flex items-center space-x-1.5 transition-colors whitespace-nowrap ${
+              activeTab === 'agent'
+                ? 'border-cyan-500 text-cyan-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Radio className="w-4 h-4 text-blue-400" />
+            <span>Client Agent</span>
           </button>
 
           <button
             onClick={() => setActiveTab('docker')}
-            className={`py-3 px-4 border-b-2 flex items-center space-x-2 transition-colors ${
+            className={`py-3 px-3.5 border-b-2 flex items-center space-x-1.5 transition-colors whitespace-nowrap ${
               activeTab === 'docker'
                 ? 'border-cyan-500 text-cyan-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Server className="w-4 h-4" />
-            <span>Docker & Nginx SSL</span>
+            <span>Docker & SSL</span>
           </button>
         </div>
 
@@ -508,6 +568,354 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-white focus:outline-none focus:border-purple-500"
                     />
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: DIENSTBENUTZER FÜR RUNNER (HELPDESK DELEGATION) */}
+          {activeTab === 'runner' && (
+            <div className="space-y-5">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                    <UserCheck className="w-4 h-4 text-emerald-400" />
+                    <span>Dienstbenutzer für Runner (Delegated Helpdesk Deployment)</span>
+                  </h3>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.runnerServiceAccount.enabled}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          runnerServiceAccount: {
+                            ...settings.runnerServiceAccount,
+                            enabled: e.target.checked,
+                          },
+                        })
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                  Permits non-administrative Helpdesk technicians and Junior IT support personnel to install software and run deployment jobs without giving them Domain Admin or local administrator credentials. Installations execute silently through this elevated service account or through the background agent.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Runner Service Account Username:
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.runnerServiceAccount.username}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          runnerServiceAccount: {
+                            ...settings.runnerServiceAccount,
+                            username: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="CORP\svc_fdim_runner"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Active Directory Domain / Realm:
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.runnerServiceAccount.domain}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          runnerServiceAccount: {
+                            ...settings.runnerServiceAccount,
+                            domain: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="CORP"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-800/80">
+                  <label className="flex items-start space-x-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.runnerServiceAccount.delegatedHelpdeskAllowed}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          runnerServiceAccount: {
+                            ...settings.runnerServiceAccount,
+                            delegatedHelpdeskAllowed: e.target.checked,
+                          },
+                        })
+                      }
+                      className="mt-0.5 rounded border-slate-700 text-emerald-600 focus:ring-emerald-500 bg-slate-900"
+                    />
+                    <div>
+                      <span className="text-xs font-semibold text-slate-200">
+                        Allow Helpdesk Role to Trigger Installations via this Account
+                      </span>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        When enabled, technicians with the &quot;Technician&quot; or &quot;Operator&quot; role can deploy approved catalog packages without requiring administrative credentials on the target PC.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: PROXMOX SANDBOX & VM PACKAGE TESTING */}
+          {activeTab === 'proxmox' && (
+            <div className="space-y-5">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                    <Box className="w-4 h-4 text-purple-400" />
+                    <span>Proxmox VE & VM Sandbox Environment</span>
+                  </h3>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.proxmoxConfig.enabled}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          proxmoxConfig: {
+                            ...settings.proxmoxConfig,
+                            enabled: e.target.checked,
+                          },
+                        })
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                  Safely test unattended installers on an isolated Windows VM template on Proxmox VE. The test runner checks silent arguments, exit codes, and registry detection rules, then automatically reverts the VM snapshot to clean baseline state.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Proxmox VE API URL:
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.proxmoxConfig.apiUrl}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          proxmoxConfig: { ...settings.proxmoxConfig, apiUrl: e.target.value },
+                        })
+                      }
+                      placeholder="https://pve01.corp.internal:8006/api2/json"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Cluster Node:
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.proxmoxConfig.node}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          proxmoxConfig: { ...settings.proxmoxConfig, node: e.target.value },
+                        })
+                      }
+                      placeholder="pve-node1"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Sandbox Test VM ID (VMID):
+                    </label>
+                    <input
+                      type="number"
+                      value={settings.proxmoxConfig.vmTemplateId}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          proxmoxConfig: { ...settings.proxmoxConfig, vmTemplateId: parseInt(e.target.value, 10) || 9000 },
+                        })
+                      }
+                      placeholder="9000"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Clean Baseline Snapshot Name:
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.proxmoxConfig.cleanSnapshotName}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          proxmoxConfig: { ...settings.proxmoxConfig, cleanSnapshotName: e.target.value },
+                        })
+                      }
+                      placeholder="clean-baseline"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-800/80">
+                  <label className="flex items-start space-x-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.proxmoxConfig.autoRollback}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          proxmoxConfig: { ...settings.proxmoxConfig, autoRollback: e.target.checked },
+                        })
+                      }
+                      className="mt-0.5 rounded border-slate-700 text-purple-600 focus:ring-purple-500 bg-slate-900"
+                    />
+                    <div>
+                      <span className="text-xs font-semibold text-slate-200">
+                        Automatic Snapshot Rollback after Successful Test (Standardstatus wiederherstellen)
+                      </span>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Immediately roll back the test VM to the pristine baseline snapshot after testing so the environment is always clean for subsequent package tests.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CLIENT AGENT & BACKGROUND HEARTBEAT TASK */}
+          {activeTab === 'agent' && (
+            <div className="space-y-5">
+              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                    <Radio className="w-4 h-4 text-blue-400" />
+                    <span>Client Background Agent (Scheduled Task)</span>
+                  </h3>
+                  <a
+                    href={`/api/agent/script/installer?serverUrl=${encodeURIComponent(settings.agentConfig.serverUrl)}&intervalMinutes=${settings.agentConfig.heartbeatIntervalMinutes}&bootDelayMinutes=${settings.agentConfig.bootDelayMinutes}`}
+                    download="Install-FDIMAgent.ps1"
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-600/30 transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download Install-FDIMAgent.ps1</span>
+                  </a>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed mb-4">
+                  The client agent installs as an invisible Windows Scheduled Task running under <code>NT AUTHORITY\SYSTEM</code>. It reports client health, uptime, installed software inventory, and pulls pending deployment wait-tasks.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Heartbeat Polling Interval:
+                    </label>
+                    <select
+                      value={settings.agentConfig.heartbeatIntervalMinutes}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          agentConfig: { ...settings.agentConfig, heartbeatIntervalMinutes: parseInt(e.target.value, 10) },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    >
+                      <option value={15}>Every 15 Minutes</option>
+                      <option value={30}>Every 30 Minutes (Recommended)</option>
+                      <option value={60}>Every 60 Minutes</option>
+                      <option value={120}>Every 2 Hours</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Startup Delay after Boot:
+                    </label>
+                    <select
+                      value={settings.agentConfig.bootDelayMinutes}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          agentConfig: { ...settings.agentConfig, bootDelayMinutes: parseInt(e.target.value, 10) },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    >
+                      <option value={2}>2 Minutes</option>
+                      <option value={5}>5 Minutes (Recommended for DHCP)</option>
+                      <option value={10}>10 Minutes</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      FDIM Server URL:
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.agentConfig.serverUrl}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          agentConfig: { ...settings.agentConfig, serverUrl: e.target.value },
+                        })
+                      }
+                      placeholder="http://fdim.corp.internal:3000"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* 1-Liner Quick Deploy Box */}
+                <div className="mt-4 p-3 bg-slate-900/90 rounded-lg border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+                      <Terminal className="w-3.5 h-3.5 text-blue-400" />
+                      <span>1-Liner PowerShell GPO / Admin Deployment Command:</span>
+                    </span>
+                    <button
+                      onClick={() =>
+                        copyToClipboard(
+                          `irm ${settings.agentConfig.serverUrl}/api/agent/script/installer | iex`,
+                          'agent-1liner'
+                        )
+                      }
+                      className="text-xs text-slate-400 hover:text-white flex items-center space-x-1"
+                    >
+                      {copiedKey === 'agent-1liner' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedKey === 'agent-1liner' ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                  <pre className="bg-slate-950 p-2.5 rounded border border-slate-800 text-[11px] font-mono text-cyan-300 overflow-x-auto">
+                    irm {settings.agentConfig.serverUrl}/api/agent/script/installer | iex
+                  </pre>
                 </div>
               </div>
             </div>

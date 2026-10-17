@@ -24,10 +24,12 @@ import { AuditCertificateModal } from './components/AuditCertificateModal';
 import { SystemConfigManager } from './components/SystemConfigManager';
 import { SettingsModal } from './components/SettingsModal';
 import { LoginModal } from './components/LoginModal';
+import { ADComputersView } from './components/ADComputersView';
+import { ClientAgentQueueView } from './components/ClientAgentQueueView';
 import { loadWizardDraft } from './utils/wizardAutoSave';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'wizard' | 'quick-deploy' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers'>('wizard');
+  const [activeTab, setActiveTab] = useState<'wizard' | 'quick-deploy' | 'ad-computers' | 'agent' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers'>('wizard');
   const [packages, setPackages] = useState<SoftwarePackage[]>([]);
   const [customers, setCustomers] = useState<CustomerProfile[]>([]);
   const [deployments, setDeployments] = useState<DeploymentRecord[]>([]);
@@ -51,6 +53,26 @@ export default function App() {
       clientId: 'fdim-suite',
       clientSecret: '',
       redirectUri: 'https://fdim.corp.internal.net/oauth/callback',
+    },
+    runnerServiceAccount: {
+      enabled: true,
+      username: 'CORP\\svc_fdim_runner',
+      domain: 'CORP',
+      description: 'Dedicated elevated service account for Helpdesk delegated package deployment without local admin rights',
+      delegatedHelpdeskAllowed: true,
+    },
+    proxmoxConfig: {
+      enabled: true,
+      apiUrl: 'https://pve01.corp.internal:8006/api2/json',
+      node: 'pve-node1',
+      vmTemplateId: 9000,
+      cleanSnapshotName: 'clean-baseline',
+      autoRollback: true,
+    },
+    agentConfig: {
+      heartbeatIntervalMinutes: 30,
+      bootDelayMinutes: 5,
+      serverUrl: 'http://fdim.corp.internal:3000',
     },
   });
 
@@ -505,6 +527,30 @@ export default function App() {
             customers={customers}
             defaultDomain={appSettings.defaultGlobalDomain}
             onRunQuickDeployment={handleRunQuickDeployment}
+          />
+        )}
+
+        {activeTab === 'ad-computers' && (
+          <ADComputersView
+            customers={customers}
+            packages={packages}
+            onSelectMachineForProvisioning={(mach, custId) => {
+              setMachineName(mach);
+              setSelectedCustomerId(custId);
+              setActiveTab('wizard');
+            }}
+            onOpenQuickDeployForMachine={(mach, cust) => {
+              setMachineName(mach);
+              setSelectedCustomerId(cust.id);
+              setActiveTab('quick-deploy');
+            }}
+          />
+        )}
+
+        {activeTab === 'agent' && (
+          <ClientAgentQueueView
+            customers={customers}
+            packages={packages}
           />
         )}
 

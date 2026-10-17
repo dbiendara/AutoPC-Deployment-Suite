@@ -32,6 +32,8 @@ import {
   FolderOpen,
   Circle,
   Printer,
+  UserCheck,
+  Radio,
 } from 'lucide-react';
 
 interface LiveRunnerProps {
@@ -88,6 +90,7 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
   const [isFinished, setIsFinished] = useState(false);
   const [copiedLog, setCopiedLog] = useState(false);
   const [logFilter, setLogFilter] = useState<'all' | 'errors' | 'success'>('all');
+  const [executionIdentity, setExecutionIdentity] = useState<'service_account' | 'agent_system' | 'technician'>('service_account');
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
@@ -438,6 +441,53 @@ export const LiveRunner: React.FC<LiveRunnerProps> = ({
             <span className="font-mono text-emerald-400 font-bold">
               {Math.floor(elapsedSeconds / 60)}m {elapsedSeconds % 60}s
             </span>
+          </div>
+        </div>
+
+        {/* Execution Identity & Helpdesk Delegation Bar */}
+        <div className="mt-4 p-3 bg-slate-950/80 rounded-xl border border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-2">
+            <UserCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-semibold text-slate-200">Execution Identity:</span>
+            <span className="text-slate-400 hidden md:inline">
+              (Dienstbenutzer für Helpdesk-Mitarbeiter ohne lokale Adminrechte)
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-1.5">
+            <button
+              onClick={() => setExecutionIdentity('service_account')}
+              className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-semibold transition-all ${
+                executionIdentity === 'service_account'
+                  ? 'bg-emerald-950 border border-emerald-700 text-emerald-300'
+                  : 'bg-slate-900 text-slate-400 hover:text-white'
+              }`}
+              title="Runs under configured Service Account (CORP\svc_fdim_runner)"
+            >
+              CORP\svc_fdim_runner (Delegated)
+            </button>
+            <button
+              onClick={() => setExecutionIdentity('agent_system')}
+              className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-semibold transition-all ${
+                executionIdentity === 'agent_system'
+                  ? 'bg-blue-950 border border-blue-700 text-blue-300'
+                  : 'bg-slate-900 text-slate-400 hover:text-white'
+              }`}
+              title="Dispatched to client agent running as NT AUTHORITY\SYSTEM"
+            >
+              Client Agent (SYSTEM)
+            </button>
+            <button
+              onClick={() => setExecutionIdentity('technician')}
+              className={`px-2.5 py-1 rounded-lg font-mono text-[11px] font-semibold transition-all ${
+                executionIdentity === 'technician'
+                  ? 'bg-cyan-950 border border-cyan-700 text-cyan-300'
+                  : 'bg-slate-900 text-slate-400 hover:text-white'
+              }`}
+              title="Runs under current technician interactive token"
+            >
+              Technician Token
+            </button>
           </div>
         </div>
       </div>

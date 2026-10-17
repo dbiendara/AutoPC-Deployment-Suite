@@ -13,12 +13,14 @@ import {
   Settings,
   User,
   Shield,
+  Radio,
+  Network,
 } from 'lucide-react';
 import { AuthUser } from '../types';
 
 interface HeaderProps {
-  activeTab: 'wizard' | 'quick-deploy' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers';
-  setActiveTab: (tab: 'wizard' | 'quick-deploy' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers') => void;
+  activeTab: 'wizard' | 'quick-deploy' | 'ad-computers' | 'agent' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers';
+  setActiveTab: (tab: 'wizard' | 'quick-deploy' | 'ad-computers' | 'agent' | 'runner' | 'library' | 'ai-detective' | 'history' | 'customers') => void;
   machineName: string;
   selectedCustomerName: string;
   isDeploying: boolean;
@@ -104,6 +106,32 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <PackageCheck className="w-4 h-4 text-emerald-300" />
                 <span className="hidden sm:inline">Quick Deploy</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('ad-computers')}
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  activeTab === 'ad-computers'
+                    ? 'bg-cyan-700 text-white shadow-md shadow-cyan-700/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+                title="Active Directory Computer inventory, LDAP sync, and bulk actions"
+              >
+                <Network className="w-4 h-4 text-cyan-300" />
+                <span className="hidden md:inline">AD Computers</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('agent')}
+                className={`flex items-center space-x-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  activeTab === 'agent'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+                title="Client scheduled task agent heartbeats and offline wait-tasks queue"
+              >
+                <Radio className="w-4 h-4 text-blue-300" />
+                <span className="hidden md:inline">Agent & Queue</span>
               </button>
 
               <button

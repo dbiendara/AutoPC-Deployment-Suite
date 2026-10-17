@@ -154,6 +154,94 @@ export interface AppSettings {
     clientSecret: string;
     redirectUri: string;
   };
+  runnerServiceAccount: {
+    enabled: boolean;
+    username: string; // e.g. "CORP\svc_fdim_runner"
+    domain: string;
+    description: string;
+    delegatedHelpdeskAllowed: boolean;
+  };
+  proxmoxConfig: {
+    enabled: boolean;
+    apiUrl: string; // e.g. "https://pve01.corp.internal:8006/api2/json"
+    node: string; // e.g. "pve-node1"
+    vmTemplateId: number; // e.g. 9000
+    cleanSnapshotName: string; // e.g. "clean-baseline"
+    autoRollback: boolean;
+  };
+  agentConfig: {
+    heartbeatIntervalMinutes: number; // e.g. 30
+    bootDelayMinutes: number; // e.g. 5
+    serverUrl: string; // e.g. "http://fdim.corp.internal:3000"
+  };
+}
+
+export interface ADComputer {
+  id: string;
+  name: string; // NetBIOS name, e.g. "WS-FINANCE-01"
+  dnsHostName: string; // FQDN, e.g. "ws-finance-01.corp.internal.net"
+  operatingSystem: string; // e.g. "Windows 11 Pro 23H2"
+  ouPath: string; // e.g. "OU=Finance,OU=Workstations,DC=corp,DC=internal,DC=net"
+  ipAddress: string;
+  status: 'Online' | 'Offline' | 'AgentConnected';
+  pingMs?: number;
+  lastSeen: string;
+  agentInstalled: boolean;
+  agentVersion?: string;
+  lastHeartbeat?: string;
+  installedPackageIds: string[];
+  customerProfileId: string;
+  description?: string;
+  currentUser?: string;
+  uptimeHours?: number;
+}
+
+export interface QueuedTask {
+  id: string;
+  machineName: string;
+  taskType: 'SoftwareInstall' | 'SoftwareUpdate' | 'FullProvisioning' | 'ConfigSwitch' | 'ComplianceScan';
+  title: string;
+  status: 'queued' | 'dispatching' | 'running' | 'completed' | 'failed' | 'cancelled';
+  payload: {
+    packageIds?: string[];
+    customerProfileId?: string;
+    customSwitches?: Record<string, string>;
+    configFiles?: Record<string, string>;
+    switchIds?: string[];
+    switchParameters?: Record<string, string | number>;
+    command?: string;
+  };
+  executionMode: 'agent_system' | 'service_account' | 'interactive';
+  serviceAccount?: string;
+  createdAt: string;
+  dispatchedAt?: string;
+  completedAt?: string;
+  resultLog?: string;
+  exitCode?: number;
+  createdBy: string;
+  retryCount?: number;
+  maxRetries?: number;
+}
+
+export interface PackageSandboxTest {
+  id: string;
+  packageId: string;
+  packageName: string;
+  environmentType: 'proxmox' | 'hyperv' | 'local_sandbox';
+  proxmoxConfig?: {
+    node: string;
+    vmId: number;
+    templateName: string;
+    snapshotName: string;
+    autoRollback: boolean;
+  };
+  status: 'running' | 'passed' | 'failed' | 'rolled_back';
+  startedAt: string;
+  completedAt?: string;
+  logs: Array<{ timestamp: string; level: 'info' | 'warn' | 'error' | 'success'; message: string }>;
+  exitCode?: number;
+  detectionVerified: boolean;
+  rollbackExecuted: boolean;
 }
 
 export interface AuthUser {
@@ -197,3 +285,4 @@ export interface AITestInstallResult {
   }>;
   recommendedTweaks?: string[];
 }
+
