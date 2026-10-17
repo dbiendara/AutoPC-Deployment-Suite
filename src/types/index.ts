@@ -268,6 +268,7 @@ export interface AuthUser {
   role: 'Administrator' | 'Technician' | 'Operator';
   authProvider: 'local' | 'active_directory' | 'keycloak';
   avatarInitials?: string;
+  showProfanity?: boolean; // User preference: true = "Fuck Doing It Manually", false = "Forget Doing It Manually"
 }
 
 export interface AIDetectionResult {

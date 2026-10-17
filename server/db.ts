@@ -185,6 +185,7 @@ export function seedInitialDataIfEmpty(
       role: 'Administrator',
       authProvider: 'local',
       avatarInitials: 'DA',
+      showProfanity: true,
     };
     const defaultTech: AuthUser = {
       id: 'usr-tech1',
@@ -194,6 +195,7 @@ export function seedInitialDataIfEmpty(
       role: 'Technician',
       authProvider: 'local',
       avatarInitials: 'FE',
+      showProfanity: true,
     };
     insertUser.run(defaultAdmin.id, defaultAdmin.username, JSON.stringify(defaultAdmin));
     insertUser.run(defaultTech.id, defaultTech.username, JSON.stringify(defaultTech));
