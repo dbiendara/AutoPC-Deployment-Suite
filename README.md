@@ -8,7 +8,7 @@ With FDIM, technicians can select or customize client profiles, enforce critical
 
 ---
 
-![FDIM Workstation Provisioning Suite](src/assets/images/fdim_dashboard_overview_1792228910304.jpg)
+![FDIM Workstation Provisioning Suite](src/assets/images/fdim_real_wizard.png)
 
 ---
 
@@ -26,7 +26,7 @@ With FDIM, technicians can select or customize client profiles, enforce critical
 
 ### 🖥️ Active Directory Computers Directory & Multi-PC Bulk Rollouts
 
-![Active Directory Computers Directory](src/assets/images/fdim_ad_computers_1792228911044.jpg)
+![Active Directory Computers Directory](src/assets/images/fdim_real_ad_computers.png)
 
 - **Live AD Domain Computer Inventory**: Complete directory of all domain-joined client workstations, Laptops, and departmental PCs with real-time status tracking.
 - **LDAP Tree Sync & Auto-Discovery**: One-click LDAP synchronization with corporate Domain Controllers (`(&(objectCategory=computer)(objectClass=user))`) to discover new endpoints and track OU memberships.
@@ -37,7 +37,7 @@ With FDIM, technicians can select or customize client profiles, enforce critical
 
 ### 🤖 Autonomous Client Agent & Offline Wait-Tasks Engine
 
-![FDIM Client Heartbeat Agent & Wait-Tasks Queue](src/assets/images/fdim_client_agent_1792228911378.jpg)
+![FDIM Client Heartbeat Agent & Wait-Tasks Queue](src/assets/images/fdim_real_agent_tasks.png)
 
 - **Invisible Windows Scheduled Task**: Installs the `FDIM-ClientAgent` scheduled task on Windows 10/11 endpoints running under `NT AUTHORITY\SYSTEM`—completely silent and invisible to interactive users.
 - **Startup Boot Trigger & Recurring Heartbeat**:
@@ -142,7 +142,7 @@ With FDIM, technicians can select or customize client profiles, enforce critical
 
 ### ⏱️ Interactive Live Runner & Audit Certificates
 
-![FDIM Live Runner PowerShell Execution Console](src/assets/images/fdim_liverunner_terminal_1792228910863.jpg)
+![FDIM Live Runner PowerShell Execution Console](src/assets/images/fdim_real_runner.png)
 
 - **Step-by-Step Execution Console**: Real-time simulated or live execution terminal with timer tracking, status chips, and step-level rerun capabilities.
 - **Compliance Audit Certificates**: Generates downloadable, cryptographically identifiable completion certificates documenting machine hostname, domain, customer profile, applied system switches, and installed package inventory.
@@ -154,12 +154,12 @@ With FDIM, technicians can select or customize client profiles, enforce critical
 
 | **Workstation Deployment Wizard** | **Live Runner PowerShell Terminal** |
 |:---:|:---:|
-| ![Workstation Wizard](src/assets/images/fdim_dashboard_overview_1792228910304.jpg) | ![Live Runner](src/assets/images/fdim_liverunner_terminal_1792228910863.jpg) |
+| ![Workstation Wizard](src/assets/images/fdim_real_wizard.png) | ![Live Runner](src/assets/images/fdim_real_runner.png) |
 | *Step-by-step provisioning: Customer profile, Local Admin, OOBE cleanup, and Software catalog* | *Real-time PowerShell execution stream with pipeline steps & live logging* |
 
 | **Active Directory Computers Directory** | **Autonomous Client Agent & Wait-Tasks Queue** |
 |:---:|:---:|
-| ![AD Computers](src/assets/images/fdim_ad_computers_1792228911044.jpg) | ![Client Agent Queue](src/assets/images/fdim_client_agent_1792228911378.jpg) |
+| ![AD Computers](src/assets/images/fdim_real_ad_computers.png) | ![Client Agent Queue](src/assets/images/fdim_real_agent_tasks.png) |
 | *LDAP domain inventory with ping reachability & multi-PC bulk rollouts* | *Offline machine wait-tasks dispatcher, recurring heartbeat graph & scheduled tasks* |
 
 ---
