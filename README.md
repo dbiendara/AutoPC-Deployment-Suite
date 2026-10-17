@@ -8,6 +8,10 @@ With FDIM, technicians can select or customize client profiles, enforce critical
 
 ---
 
+![FDIM Workstation Provisioning Suite](src/assets/images/fdim_dashboard_overview_1792228910304.jpg)
+
+---
+
 ## 🚀 Key Features
 
 ### 💾 Workstation Wizard Auto-Save & Draft Persistence
@@ -21,6 +25,9 @@ With FDIM, technicians can select or customize client profiles, enforce critical
   - Persistence indicator badge in the zero-touch deployment launcher bar.
 
 ### 🖥️ Active Directory Computers Directory & Multi-PC Bulk Rollouts
+
+![Active Directory Computers Directory](src/assets/images/fdim_ad_computers_1792228911044.jpg)
+
 - **Live AD Domain Computer Inventory**: Complete directory of all domain-joined client workstations, Laptops, and departmental PCs with real-time status tracking.
 - **LDAP Tree Sync & Auto-Discovery**: One-click LDAP synchronization with corporate Domain Controllers (`(&(objectCategory=computer)(objectClass=user))`) to discover new endpoints and track OU memberships.
 - **Granular Filter & Search Bar**: Instant search across hostnames, IP addresses, active users, descriptions, and Organizational Units (OUs like `OU=Workstations`, `OU=Finance`, `OU=Laptops`).
@@ -29,6 +36,9 @@ With FDIM, technicians can select or customize client profiles, enforce critical
 - **Hostnames & CSV Import**: Bulk paste lists of computer names or import CSV exports directly into FDIM.
 
 ### 🤖 Autonomous Client Agent & Offline Wait-Tasks Engine
+
+![FDIM Client Heartbeat Agent & Wait-Tasks Queue](src/assets/images/fdim_client_agent_1792228911378.jpg)
+
 - **Invisible Windows Scheduled Task**: Installs the `FDIM-ClientAgent` scheduled task on Windows 10/11 endpoints running under `NT AUTHORITY\SYSTEM`—completely silent and invisible to interactive users.
 - **Startup Boot Trigger & Recurring Heartbeat**:
   - Automatically triggers at system startup with a configurable 3-5 minute delay (ensuring network adapters and DHCP lease are fully acquired).
@@ -131,9 +141,26 @@ With FDIM, technicians can select or customize client profiles, enforce critical
   2. **Active Setup First-Logon Staging**: FDIM generates a self-contained payload at `C:\ProgramData\FDIM\UserLogonSetup.ps1` and registers it in `HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\FDIM_UserProvisioning` (with a secondary Scheduled Task trigger at logon). When any user signs in for the first time, the Windows Shell silently executes the script in their user context, mapping persistent drives (`net use S: "\\server\share" /persistent:yes` with dynamic `%USERNAME%` resolution) and assigning printers!
 
 ### ⏱️ Interactive Live Runner & Audit Certificates
+
+![FDIM Live Runner PowerShell Execution Console](src/assets/images/fdim_liverunner_terminal_1792228910863.jpg)
+
 - **Step-by-Step Execution Console**: Real-time simulated or live execution terminal with timer tracking, status chips, and step-level rerun capabilities.
 - **Compliance Audit Certificates**: Generates downloadable, cryptographically identifiable completion certificates documenting machine hostname, domain, customer profile, applied system switches, and installed package inventory.
 - **Historical Deployment Log**: Filterable record of historical deployments with fast export and review capabilities.
+
+---
+
+## 📸 Screenshots & Visual Tour
+
+| **Workstation Deployment Wizard** | **Live Runner PowerShell Terminal** |
+|:---:|:---:|
+| ![Workstation Wizard](src/assets/images/fdim_dashboard_overview_1792228910304.jpg) | ![Live Runner](src/assets/images/fdim_liverunner_terminal_1792228910863.jpg) |
+| *Step-by-step provisioning: Customer profile, Local Admin, OOBE cleanup, and Software catalog* | *Real-time PowerShell execution stream with pipeline steps & live logging* |
+
+| **Active Directory Computers Directory** | **Autonomous Client Agent & Wait-Tasks Queue** |
+|:---:|:---:|
+| ![AD Computers](src/assets/images/fdim_ad_computers_1792228911044.jpg) | ![Client Agent Queue](src/assets/images/fdim_client_agent_1792228911378.jpg) |
+| *LDAP domain inventory with ping reachability & multi-PC bulk rollouts* | *Offline machine wait-tasks dispatcher, recurring heartbeat graph & scheduled tasks* |
 
 ---
 
